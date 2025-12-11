@@ -1,5 +1,3 @@
-usuarios = {}  # Dicionário na RAM
-
 def Criar_Usuario(list_usuarios, nome: str, senha: str, email: str, idade: int, id: int):
     dic_usuario = {
         "nome": nome,
