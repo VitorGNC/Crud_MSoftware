@@ -20,6 +20,7 @@ class UsuarioORM(Base):
     __tablename__ = "usuarios"
 
     id: int         = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    login: str      = Column(String(12), unique=True, index=True, nullable=False)
     nome: str       = Column(String(100), nullable=False)
     senha_hash: str = Column(String(200), nullable=False)
     email: str      = Column(String(150), unique=True, index=True, nullable=False)
@@ -72,10 +73,22 @@ class AdministradorMixin:
 # Pydantic Schemas  –  Usuário
 # =============================================================================
 class UsuarioCriar(BaseModel):
+    login: str
     nome: str
     email: str
     senha: str
     idade: int
+
+    @field_validator("login")
+    @classmethod
+    def login_valido(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Login não pode ser vazio.")
+        if len(v) > 12:
+            raise ValueError("Login deve ter no máximo 12 caracteres.")
+        if any(c.isdigit() for c in v):
+            raise ValueError("Login não pode conter números.")
+        return v
 
     @field_validator("idade")
     @classmethod
@@ -100,6 +113,7 @@ class UsuarioAtualizar(BaseModel):
 
 class UsuarioResposta(BaseModel):
     id: int
+    login: str
     nome: str
     email: str
     idade: int

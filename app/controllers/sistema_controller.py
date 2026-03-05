@@ -55,6 +55,7 @@ class ControleSistema:
                 detail="E-mail já cadastrado.",
             )
         novo = UsuarioORM(
+            login=dados.login,
             nome=dados.nome,
             email=dados.email,
             senha_hash=hash_senha(dados.senha),
