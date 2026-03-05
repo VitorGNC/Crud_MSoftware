@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_usuario_atual
 from app.database import get_db
-from app.controllers.facade import FacadeSingletonController
+from app.service.facade_service import FacadeService
 from app.models.usuario import (
     UsuarioCriar,
     UsuarioAtualizar,
@@ -22,11 +22,6 @@ from app.models.usuario import (
 
 router = APIRouter(tags=["AlterarInfos (Usuário)"])
 
-
-def _ctrl(db: Session) -> FacadeSingletonController:
-    return FacadeSingletonController.get_instance(db)
-
-
 # ------------------------------------------------------------------
 # Login()
 # ------------------------------------------------------------------
@@ -35,7 +30,7 @@ def login(
     form: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
-    return _ctrl(db).autenticar(form)
+    return FacadeService.get_instance(db).autenticar(form)
 
 
 # ------------------------------------------------------------------
@@ -48,7 +43,7 @@ def login(
     summary="Registro público de novo usuário",
 )
 def registrar(dados: UsuarioCriar, db: Session = Depends(get_db)):
-    return _ctrl(db).registrar(dados)
+    return FacadeService.get_instance(db).registrar(dados)
 
 
 # ------------------------------------------------------------------
@@ -76,7 +71,7 @@ def solicitar_edicao(
     usuario: UsuarioORM = Depends(get_usuario_atual),
     db: Session = Depends(get_db),
 ):
-    return _ctrl(db).editar_perfil(usuario.id, dados)
+    return FacadeService.get_instance(db).editar_perfil(usuario.id, dados)
 
 
 # ------------------------------------------------------------------
@@ -91,4 +86,4 @@ def solicitar_encerramento(
     usuario: UsuarioORM = Depends(get_usuario_atual),
     db: Session = Depends(get_db),
 ):
-    return _ctrl(db).encerrar_conta(usuario.id)
+    return FacadeService.get_instance(db).encerrar_conta(usuario.id)

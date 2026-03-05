@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_admin_atual
 from app.database import get_db
-from app.controllers.facade import FacadeSingletonController
+from app.service.facade_service import FacadeService
 from app.models.usuario import (
     AlterarPermissaoSchema,
     UsuarioCriar,
@@ -24,11 +24,6 @@ from app.models.usuario import (
 )
 
 router = APIRouter(prefix="/admin", tags=["GerenciarUsuários (Admin)"])
-
-
-def _ctrl(db: Session) -> FacadeSingletonController:
-    return FacadeSingletonController.get_instance(db)
-
 
 
 # ------------------------------------------------------------------
@@ -43,7 +38,7 @@ def mostrar_lista(
     db: Session = Depends(get_db),
     _admin=Depends(get_admin_atual),
 ):
-    return _ctrl(db).mostrar_lista(somente_ativos=True)
+    return FacadeService.get_instance(db).mostrar_lista(somente_ativos=True)
 
 
 # ------------------------------------------------------------------
@@ -58,7 +53,7 @@ def visualizar_todos_usuarios(
     db: Session = Depends(get_db),
     _admin=Depends(get_admin_atual),
 ):
-    return _ctrl(db).visualizar_todos_usuarios()
+    return FacadeService.get_instance(db).visualizar_todos_usuarios()
 
 
 # ------------------------------------------------------------------
@@ -76,7 +71,7 @@ def cadastro_usuario(
     db: Session = Depends(get_db),
     _admin=Depends(get_admin_atual),
 ):
-    return _ctrl(db).cadastro(dados, is_admin=is_admin)
+    return FacadeService.get_instance(db).cadastro(dados, is_admin=is_admin)
 
 
 # ------------------------------------------------------------------
@@ -93,7 +88,7 @@ def edicao_usuario(
     db: Session = Depends(get_db),
     _admin=Depends(get_admin_atual),
 ):
-    return _ctrl(db).edicao(usuario_id, dados)
+    return FacadeService.get_instance(db).edicao(usuario_id, dados)
 
 
 # ------------------------------------------------------------------
@@ -110,7 +105,7 @@ def alterar_permissoes(
     db: Session = Depends(get_db),
     _admin=Depends(get_admin_atual),
 ):
-    return _ctrl(db).alterar_permissoes(usuario_id, payload)
+    return FacadeService.get_instance(db).alterar_permissoes(usuario_id, payload)
 
 
 # ------------------------------------------------------------------
@@ -126,7 +121,7 @@ def desativar_usuario(
     db: Session = Depends(get_db),
     _admin=Depends(get_admin_atual),
 ):
-    return _ctrl(db).desativar(usuario_id)
+    return FacadeService.get_instance(db).desativar(usuario_id)
 
 
 # ------------------------------------------------------------------
@@ -142,7 +137,7 @@ def deletar_usuario(
     db: Session = Depends(get_db),
     _admin=Depends(get_admin_atual),
 ):
-    _ctrl(db).deletar(usuario_id)
+    FacadeService.get_instance(db).deletar(usuario_id)
 
 # ------------------------------------------------------------------
 # contar_entidades()  –  totais por tipo
@@ -155,4 +150,4 @@ def contar_entidades(
     db: Session = Depends(get_db),
     _admin=Depends(get_admin_atual),
 ):
-    return _ctrl(db).contar_entidades()
+    return FacadeService.get_instance(db).contar_entidades()

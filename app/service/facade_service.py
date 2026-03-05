@@ -1,51 +1,36 @@
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Dict
 
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from app.controllers.gerenciar_usuario import GerenciarUsuarioController
-from app.controllers.login_controller import LoginController
+from app.models.media import MediaORM
+from app.models.usuario import UsuarioORM
+from app.service.gerenciar_usuario import GerenciarUsuarioService
+from app.service.login_controller import LoginController
 
 
 # =============================================================================
-# <<Facade + Singleton>> FacadeSingletonController
-# Ponto único de acesso a GerenciarUsuarioController e LoginController.
+# <<Facade>> FacadeService
+# Ponto único de acesso às views para GerenciarUsuarioService e
+# LoginController.
+#
+# Uma nova instância é criada por requisição HTTP, alinhada ao ciclo
+# de vida da Session do banco injetada pelo FastAPI via Depends(get_db).
+# Usar Singleton aqui seria incorreto: sessões são recursos por-requisição
+# e compartilhá-las entre threads concorrentes causaria race conditions.
 # =============================================================================
-class FacadeSingletonController:
-    """
-    <<Facade + Singleton>>
+class FacadeService:
 
-    - Singleton: garante uma única instância por processo; a sessão de banco
-      é atualizada a cada chamada a get_instance() para compatibilidade com
-      o modelo de sessão por requisição do FastAPI.
-    - Facade: expõe uma interface unificada delegando para os dois controllers
-      especializados abaixo.
-
-        ┌──────────────────────────────────────────────────┐
-        │          FacadeSingletonController               │
-        │  ┌─────────────────────┐  ┌───────────────────┐ │
-        │  │ GerenciarUsuario    │  │  LoginController  │ │
-        │  │ Controller          │  │                   │ │
-        │  └─────────────────────┘  └───────────────────┘ │
-        └──────────────────────────────────────────────────┘
-    """
-
-    _instance: Optional[FacadeSingletonController] = None
-
-    def __new__(cls, db: Session) -> FacadeSingletonController:
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        # Atualiza os sub-controllers com a sessão atual da requisição
-        cls._instance._db = db
-        cls._instance._usuarios = GerenciarUsuarioController(db)
-        cls._instance._login = LoginController(db)
-        return cls._instance
+    def __init__(self, db: Session) -> None:
+        self._db = db
+        self._usuarios = GerenciarUsuarioService(db)
+        self._login = LoginController(db)
 
     @classmethod
-    def get_instance(cls, db: Session) -> FacadeSingletonController:
-        """Retorna a instância Singleton configurada com a sessão atual."""
+    def get_instance(cls, db: Session) -> FacadeService:
+        """Cria a fachada para a sessão atual da requisição."""
         return cls(db)
 
     # ------------------------------------------------------------------
@@ -53,9 +38,6 @@ class FacadeSingletonController:
     # ------------------------------------------------------------------
     def contar_entidades(self) -> Dict[str, int]:
         """Retorna a quantidade de entidades cadastradas no sistema."""
-        from app.models.usuario import UsuarioORM
-        from app.models.media import MediaORM
-
         n_usuarios = self._db.query(UsuarioORM).count()
         n_medias = self._db.query(MediaORM).count()
         return {
@@ -65,7 +47,7 @@ class FacadeSingletonController:
         }
 
     # ------------------------------------------------------------------
-    # Delegação → GerenciarUsuarioController
+    # Delegação → GerenciarUsuarioService
     # ------------------------------------------------------------------
     def mostrar_lista(self, somente_ativos: bool = True):
         return self._usuarios.mostrar_lista(somente_ativos)
@@ -105,3 +87,10 @@ class FacadeSingletonController:
 
     def encerrar_conta(self, usuario_id: int):
         return self._login.encerrar_conta(usuario_id)
+
+
+# ---------------------------------------------------------------------------
+# Alias de compatibilidade — permite migração gradual sem quebrar imports
+# existentes. Remova após atualizar todas as views.
+# ---------------------------------------------------------------------------
+FacadeSingletonService = FacadeService

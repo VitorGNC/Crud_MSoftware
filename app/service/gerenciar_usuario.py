@@ -14,12 +14,12 @@ from app.models.usuario import (
 
 
 # =============================================================================
-# <<Control>> GerenciarUsuarioController
+# <<Service>> GerenciarUsuarioService
 # Responsável pelas operações CRUD e administrativas sobre Usuários.
 # =============================================================================
-class GerenciarUsuarioController:
+class GerenciarUsuarioService:
     """
-    <<Control>> GerenciarUsuarioController
+    <<Service>> GerenciarUsuarioService
     Gerencia o ciclo de vida dos usuários: listagem, cadastro, edição,
     desativação, exclusão e alteração de permissões.
     """
