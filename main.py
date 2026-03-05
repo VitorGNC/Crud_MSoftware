@@ -2,8 +2,9 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.database import Base, engine
-from app.views.alterar_infos import router as alterar_infos_router
-from app.views.gerenciar_usuarios import router as gerenciar_usuarios_router
+from app.views.login import router as alterar_infos_router
+from app.views.usuarios import router as gerenciar_usuarios_router
+from app.views.medias import router as medias_router
 
 # Cria tabelas no banco (SQLite)
 Base.metadata.create_all(bind=engine)
@@ -24,6 +25,7 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 # Routers
 app.include_router(alterar_infos_router)
 app.include_router(gerenciar_usuarios_router)
+app.include_router(medias_router)
 
 
 @app.get("/", tags=["Root"])

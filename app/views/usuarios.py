@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_admin_atual
 from app.database import get_db
-from app.controllers.sistema_controller import ControleSistema
+from app.controllers.usuarios import ControleSistema
 from app.models.usuario import (
     AlterarPermissaoSchema,
     UsuarioCriar,
