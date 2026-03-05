@@ -15,7 +15,7 @@ from app.auth import (
     get_usuario_atual,
 )
 from app.database import get_db
-from app.controllers.uploader import UploaderController
+from app.controllers.uploader_controller import UploaderController
 from app.models.usuario import (
     UsuarioORM,
 )

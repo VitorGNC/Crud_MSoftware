@@ -10,14 +10,9 @@ from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from app.auth import (
-    ACCESS_TOKEN_EXPIRE_MINUTES,
-    criar_access_token,
-    get_usuario_atual,
-    verificar_senha,
-)
+from app.auth import get_usuario_atual
 from app.database import get_db
-from app.controllers.usuarios import ControleSistema
+from app.controllers.facade import FacadeSingletonController
 from app.models.usuario import (
     UsuarioCriar,
     UsuarioAtualizar,
@@ -25,9 +20,11 @@ from app.models.usuario import (
     UsuarioORM,
 )
 
-from datetime import timedelta
-
 router = APIRouter(tags=["AlterarInfos (Usuário)"])
+
+
+def _ctrl(db: Session) -> FacadeSingletonController:
+    return FacadeSingletonController.get_instance(db)
 
 
 # ------------------------------------------------------------------
@@ -38,23 +35,7 @@ def login(
     form: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
-    usuario: UsuarioORM = (
-        db.query(UsuarioORM)
-        .filter(UsuarioORM.email == form.username, UsuarioORM.ativo == True)
-        .first()
-    )
-    if not usuario or not verificar_senha(form.password, usuario.senha_hash):
-        from fastapi import HTTPException
-
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciais inválidas."
-        )
-
-    token = criar_access_token(
-        data={"sub": usuario.id},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
-    )
-    return {"access_token": token, "token_type": "bearer"}
+    return _ctrl(db).autenticar(form)
 
 
 # ------------------------------------------------------------------
@@ -67,7 +48,7 @@ def login(
     summary="Registro público de novo usuário",
 )
 def registrar(dados: UsuarioCriar, db: Session = Depends(get_db)):
-    return ControleSistema(db).cadastro(dados, is_admin=False)
+    return _ctrl(db).registrar(dados)
 
 
 # ------------------------------------------------------------------
@@ -95,7 +76,7 @@ def solicitar_edicao(
     usuario: UsuarioORM = Depends(get_usuario_atual),
     db: Session = Depends(get_db),
 ):
-    return ControleSistema(db).edicao(usuario.id, dados)
+    return _ctrl(db).editar_perfil(usuario.id, dados)
 
 
 # ------------------------------------------------------------------
@@ -110,4 +91,4 @@ def solicitar_encerramento(
     usuario: UsuarioORM = Depends(get_usuario_atual),
     db: Session = Depends(get_db),
 ):
-    return ControleSistema(db).desativar(usuario.id)
+    return _ctrl(db).encerrar_conta(usuario.id)

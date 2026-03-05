@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -14,12 +14,14 @@ from app.models.usuario import (
 
 
 # =============================================================================
-# <<Control>> ControleSistema
+# <<Control>> GerenciarUsuarioController
+# Responsável pelas operações CRUD e administrativas sobre Usuários.
 # =============================================================================
-class ControleSistema:
+class GerenciarUsuarioController:
     """
-    Controla operações centrais sobre Usuários.
-    Expõe: mostrarLista(), Edicao(), Cadastro().
+    <<Control>> GerenciarUsuarioController
+    Gerencia o ciclo de vida dos usuários: listagem, cadastro, edição,
+    desativação, exclusão e alteração de permissões.
     """
 
     def __init__(self, db: Session) -> None:
@@ -36,7 +38,12 @@ class ControleSistema:
         return query.all()
 
     def buscar_por_id(self, usuario_id: int) -> UsuarioORM:
-        usuario = self._db.query(UsuarioORM).filter(UsuarioORM.id == usuario_id).first()
+        """Busca um usuário pelo ID ou lança 404."""
+        usuario = (
+            self._db.query(UsuarioORM)
+            .filter(UsuarioORM.id == usuario_id)
+            .first()
+        )
         if not usuario:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -48,7 +55,7 @@ class ControleSistema:
     # Cadastro()
     # ------------------------------------------------------------------
     def cadastro(self, dados: UsuarioCriar, is_admin: bool = False) -> UsuarioORM:
-        """Cadastra um novo usuário."""
+        """Cadastra um novo usuário (admin pode definir is_admin)."""
         if self._db.query(UsuarioORM).filter(UsuarioORM.email == dados.email).first():
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -82,6 +89,9 @@ class ControleSistema:
         self._db.refresh(usuario)
         return usuario
 
+    # ------------------------------------------------------------------
+    # Deletar / Desativar
+    # ------------------------------------------------------------------
     def deletar(self, usuario_id: int) -> None:
         """Remove permanentemente um usuário (uso administrativo)."""
         usuario = self.buscar_por_id(usuario_id)

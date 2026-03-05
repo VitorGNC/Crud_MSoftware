@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_admin_atual
 from app.database import get_db
-from app.controllers.usuarios import ControleSistema
+from app.controllers.facade import FacadeSingletonController
 from app.models.usuario import (
     AlterarPermissaoSchema,
     UsuarioCriar,
@@ -26,8 +26,9 @@ from app.models.usuario import (
 router = APIRouter(prefix="/admin", tags=["GerenciarUsuários (Admin)"])
 
 
-def _ctrl(db: Session) -> ControleSistema:
-    return ControleSistema(db)
+def _ctrl(db: Session) -> FacadeSingletonController:
+    return FacadeSingletonController.get_instance(db)
+
 
 
 # ------------------------------------------------------------------
@@ -142,3 +143,16 @@ def deletar_usuario(
     _admin=Depends(get_admin_atual),
 ):
     _ctrl(db).deletar(usuario_id)
+
+# ------------------------------------------------------------------
+# contar_entidades()  –  totais por tipo
+# ------------------------------------------------------------------
+@router.get(
+    "/entidades/contagem",
+    summary="Quantidade de entidades cadastradas no sistema",
+)
+def contar_entidades(
+    db: Session = Depends(get_db),
+    _admin=Depends(get_admin_atual),
+):
+    return _ctrl(db).contar_entidades()
