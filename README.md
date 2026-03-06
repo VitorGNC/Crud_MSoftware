@@ -199,6 +199,10 @@ https://docs.google.com/document/d/1fdJ6l94bLIARBVS7ogIy57HU73l-4crGGptiMkxgb_k/
 https://docs.google.com/document/d/1s_cEoT9iPPbcc_5mt7ZMdjlJKvozlz91v9zGBvFSz14/edit?usp=sharing
 
 ---
+## Diagrama de Casos de Uso
+https://lucid.app/lucidchart/670aa4b8-6897-436b-b60b-5da51f1eb05a/edit?viewport_loc=-4532%2C-144%2C3924%2C2336%2C0_0&invitationId=inv_9f878370-8be6-4de3-869e-3d9dd72b3e7c
+
+---
 ## Evidências de Implementação
 
 ### Para o Professor: Onde Encontrar Cada Requisito
