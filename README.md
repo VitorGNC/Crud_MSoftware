@@ -189,7 +189,7 @@ https://www.canva.com/design/DAG7KDuzUMA/cgGiGQBSA8fwyYIMTHsvQw/edit
 
 ---
 
-## Descrição de Casos de uso
+## Descrição de Casos de Uso
 
 https://docs.google.com/document/d/1fdJ6l94bLIARBVS7ogIy57HU73l-4crGGptiMkxgb_k/edit?usp=sharing
 
