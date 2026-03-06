@@ -186,9 +186,19 @@ O servidor estará disponível em:
 Os diagramas de arquitetura e casos de uso estão disponíveis abaixo:
 
 https://www.canva.com/design/DAG7KDuzUMA/cgGiGQBSA8fwyYIMTHsvQw/edit
-https://docs.google.com/document/d/1fdJ6l94bLIARBVS7ogIy57HU73l-4crGGptiMkxgb_k/edit?usp=sharing
+
 ---
 
+## Descrição de Casos de uso
+
+https://docs.google.com/document/d/1fdJ6l94bLIARBVS7ogIy57HU73l-4crGGptiMkxgb_k/edit?usp=sharing
+
+---
+## Documento de Requisitos
+
+https://docs.google.com/document/d/1s_cEoT9iPPbcc_5mt7ZMdjlJKvozlz91v9zGBvFSz14/edit?usp=sharing
+
+---
 ## Evidências de Implementação
 
 ### Para o Professor: Onde Encontrar Cada Requisito
