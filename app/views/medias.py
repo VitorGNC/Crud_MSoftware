@@ -15,7 +15,7 @@ from app.auth import (
     get_usuario_atual,
 )
 from app.database import get_db
-from app.service.uploader_controller import UploaderController
+from app.service.facade_service import FacadeService
 from app.models.usuario import (
     UsuarioORM,
 )
@@ -43,7 +43,8 @@ async def fazer_upload(
     usuario: UsuarioORM = Depends(get_usuario_atual),
     db: Session = Depends(get_db),
 ):
-    return await UploaderController(db).upload_media(file, usuario.id)
+    facade = FacadeService.get_instance(db)
+    return await facade.upload_media(file, usuario.id)
 
 
 # ------------------------------------------------------------------
@@ -58,7 +59,8 @@ def get_medias(
     usuario: UsuarioORM = Depends(get_usuario_atual),
     db: Session = Depends(get_db),
 ):
-    return UploaderController(db).get_medias(usuario.id)
+    facade = FacadeService.get_instance(db)
+    return facade.get_medias(usuario.id)
 
 
 # ------------------------------------------------------------------
@@ -74,4 +76,5 @@ def delete_media(
     usuario: UsuarioORM = Depends(get_usuario_atual),
     db: Session = Depends(get_db),
 ):
-    UploaderController(db).delete_media(media_id, usuario.id, is_admin=False)
+    facade = FacadeService.get_instance(db)
+    facade.delete_media(media_id, usuario.id, is_admin=False)

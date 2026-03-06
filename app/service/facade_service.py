@@ -9,6 +9,7 @@ from app.models.media import MediaORM
 from app.models.usuario import UsuarioORM
 from app.service.gerenciar_usuario import GerenciarUsuarioService
 from app.service.login_controller import LoginController
+from app.service.uploader_controller import UploaderController
 
 
 # =============================================================================
@@ -27,6 +28,7 @@ class FacadeService:
         self._db = db
         self._usuarios = GerenciarUsuarioService(db)
         self._login = LoginController(db)
+        self._uploader = UploaderController(db)
 
     @classmethod
     def get_instance(cls, db: Session) -> FacadeService:
@@ -73,6 +75,10 @@ class FacadeService:
     def visualizar_todos_usuarios(self):
         return self._usuarios.visualizar_todos_usuarios()
 
+    def obter_estatisticas_cache(self):
+        """Retorna estatísticas do cache RAM (demonstração do armazenamento em memória)."""
+        return self._usuarios.obter_estatisticas_cache()
+
     # ------------------------------------------------------------------
     # Delegação → LoginController
     # ------------------------------------------------------------------
@@ -87,6 +93,21 @@ class FacadeService:
 
     def encerrar_conta(self, usuario_id: int):
         return self._login.encerrar_conta(usuario_id)
+
+    # ------------------------------------------------------------------
+    # Delegação → UploaderController
+    # ------------------------------------------------------------------
+    async def upload_media(self, file, user_id: int):
+        return await self._uploader.upload_media(file, user_id)
+
+    def get_medias(self, user_id: int):
+        return self._uploader.get_medias(user_id)
+
+    def get_todas_medias(self):
+        return self._uploader.get_todas_medias()
+
+    def delete_media(self, media_id: int, user_id: int, is_admin: bool = False):
+        return self._uploader.delete_media(media_id, user_id, is_admin)
 
 
 # ---------------------------------------------------------------------------

@@ -11,16 +11,20 @@ from app.auth import (
     verificar_senha,
 )
 from app.models.usuario import UsuarioCriar, UsuarioAtualizar, UsuarioORM
+from app.utils.cache import CacheRAM
 
 
 # =============================================================================
 # <<Control>> LoginController
 # Responsável por autenticação e operações do próprio perfil do usuário.
+# Utiliza cache em RAM para acesso rápido aos dados.
 # =============================================================================
 class LoginController:
     """
     <<Control>> LoginController
     Gerencia login, registro público e edição/encerramento do próprio perfil.
+    
+    **Cache em RAM**: Usa CacheRAM para armazenar dados em memória.
     """
 
     def __init__(self, db: Session) -> None:
@@ -42,7 +46,7 @@ class LoginController:
                 detail="Credenciais inválidas.",
             )
         token = criar_access_token(
-            data={"sub": usuario.id},
+            data={"sub": str(usuario.id)},
             expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
         )
         return {"access_token": token, "token_type": "bearer"}
@@ -68,6 +72,8 @@ class LoginController:
         self._db.add(novo)
         self._db.commit()
         self._db.refresh(novo)
+        # Adiciona ao cache RAM
+        CacheRAM.adicionar(novo)
         return novo
 
     # ------------------------------------------------------------------
@@ -90,6 +96,8 @@ class LoginController:
         )
         self._db.commit()
         self._db.refresh(usuario)
+        # Atualiza cache RAM
+        CacheRAM.atualizar(usuario)
         return usuario
 
     # ------------------------------------------------------------------
@@ -108,4 +116,6 @@ class LoginController:
         usuario.desativar()
         self._db.commit()
         self._db.refresh(usuario)
+        # Atualiza cache RAM
+        CacheRAM.atualizar(usuario)
         return usuario

@@ -11,39 +11,40 @@ from app.models.usuario import (
     UsuarioAtualizar,
     UsuarioORM,
 )
+from app.utils.cache import CacheRAM
 
 
 # =============================================================================
 # <<Service>> GerenciarUsuarioService
 # Responsável pelas operações CRUD e administrativas sobre Usuários.
+# Utiliza cache em RAM para acesso rápido aos dados.
 # =============================================================================
 class GerenciarUsuarioService:
     """
     <<Service>> GerenciarUsuarioService
     Gerencia o ciclo de vida dos usuários: listagem, cadastro, edição,
     desativação, exclusão e alteração de permissões.
+    
+    **Cache em RAM**: Usa CacheRAM para armazenar dados em memória.
     """
 
     def __init__(self, db: Session) -> None:
         self._db = db
+        # Inicializa cache com dados do BD
+        if not CacheRAM._inicializado:
+            usuarios = self._db.query(UsuarioORM).all()
+            CacheRAM.inicializar(usuarios)
 
     # ------------------------------------------------------------------
     # mostrarLista()
     # ------------------------------------------------------------------
     def mostrar_lista(self, somente_ativos: bool = True) -> List[UsuarioORM]:
-        """Retorna a lista de usuários (padrão: apenas ativos)."""
-        query = self._db.query(UsuarioORM)
-        if somente_ativos:
-            query = query.filter(UsuarioORM.ativo == True)
-        return query.all()
+        """Retorna a lista de usuários do cache RAM (rápido)."""
+        return CacheRAM.listar_todos(somente_ativos)
 
     def buscar_por_id(self, usuario_id: int) -> UsuarioORM:
         """Busca um usuário pelo ID ou lança 404."""
-        usuario = (
-            self._db.query(UsuarioORM)
-            .filter(UsuarioORM.id == usuario_id)
-            .first()
-        )
+        usuario = self._db.query(UsuarioORM).filter(UsuarioORM.id == usuario_id).first()
         if not usuario:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -72,6 +73,8 @@ class GerenciarUsuarioService:
         self._db.add(novo)
         self._db.commit()
         self._db.refresh(novo)
+        # Adiciona ao cache RAM
+        CacheRAM.adicionar(novo)
         return novo
 
     # ------------------------------------------------------------------
@@ -87,6 +90,8 @@ class GerenciarUsuarioService:
         )
         self._db.commit()
         self._db.refresh(usuario)
+        # Atualiza cache RAM
+        CacheRAM.atualizar(usuario)
         return usuario
 
     # ------------------------------------------------------------------
@@ -97,6 +102,8 @@ class GerenciarUsuarioService:
         usuario = self.buscar_por_id(usuario_id)
         self._db.delete(usuario)
         self._db.commit()
+        # Remove do cache RAM
+        CacheRAM.remover(usuario.id)
 
     def desativar(self, usuario_id: int) -> UsuarioORM:
         """Desativa (soft delete) a conta de um usuário."""
@@ -104,6 +111,8 @@ class GerenciarUsuarioService:
         usuario.desativar()
         self._db.commit()
         self._db.refresh(usuario)
+        # Atualiza cache RAM
+        CacheRAM.atualizar(usuario)
         return usuario
 
     # ------------------------------------------------------------------
@@ -117,9 +126,16 @@ class GerenciarUsuarioService:
         AdministradorMixin.alterar_permissoes(usuario, payload.is_admin)
         self._db.commit()
         self._db.refresh(usuario)
+        # Atualiza cache RAM
+        CacheRAM.atualizar(usuario)
         return usuario
 
     def visualizar_todos_usuarios(self) -> List[UsuarioORM]:
-        """Retorna TODOS os usuários, inclusive inativos (uso do admin)."""
-        todos = self._db.query(UsuarioORM).all()
+        """Retorna TODOS os usuários do cache RAM, inclusive inativos."""
+        todos = CacheRAM.listar_todos(somente_ativos=False)
         return AdministradorMixin.visualizar_todos_usuarios(todos)
+    
+    def obter_estatisticas_cache(self) -> dict:
+        """Retorna estatísticas do cache RAM (demonstração)."""
+        total_bd = self._db.query(UsuarioORM).count()
+        return CacheRAM.obter_estatisticas(total_bd)

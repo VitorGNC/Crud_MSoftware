@@ -151,3 +151,21 @@ def contar_entidades(
     _admin=Depends(get_admin_atual),
 ):
     return FacadeService.get_instance(db).contar_entidades()
+
+
+# ------------------------------------------------------------------
+# estatisticas_cache()  –  demonstração do cache RAM
+# ------------------------------------------------------------------
+@router.get(
+    "/cache/estatisticas",
+    summary="Estatísticas do cache RAM (demonstração armazenamento em memória)",
+)
+def estatisticas_cache(
+    db: Session = Depends(get_db),
+    _admin=Depends(get_admin_atual),
+):
+    """
+    Demonstra que o sistema utiliza armazenamento em RAM (cache) 
+    além da persistência em SQLite.
+    """
+    return FacadeService.get_instance(db).obter_estatisticas_cache()
