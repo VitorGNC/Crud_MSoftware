@@ -183,10 +183,10 @@ O servidor estará disponível em:
 
 ## Diagramas
 
-Os diagramas de arquitetura e casos de uso estão disponíveis no Canva:
+Os diagramas de arquitetura e casos de uso estão disponíveis abaixo:
 
 https://www.canva.com/design/DAG7KDuzUMA/cgGiGQBSA8fwyYIMTHsvQw/edit
-
+https://docs.google.com/document/d/1fdJ6l94bLIARBVS7ogIy57HU73l-4crGGptiMkxgb_k/edit?usp=sharing
 ---
 
 ## Evidências de Implementação
