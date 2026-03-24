@@ -1,1 +1,3 @@
-# Nenhuma dependencia externa e necessaria
+fastapi>=0.110.0
+uvicorn>=0.29.0
+python-multipart>=0.0.9

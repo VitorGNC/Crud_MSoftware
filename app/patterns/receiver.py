@@ -19,6 +19,9 @@ class NoteReceiver:
     def attach(self, note_id: str, file_path: str):
         return self._service.attach_file(note_id, file_path)
 
+    def attach_from_bytes(self, note_id: str, filename: str, payload: bytes):
+        return self._service.attach_bytes(note_id, filename, payload)
+
     def delete(self, note_id: str) -> None:
         self._service.delete_note(note_id)
 

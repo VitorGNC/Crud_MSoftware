@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.interface.gui import NotesAppGUI
+from app.interface.interface_strategy import (
+    GuiInterfaceStrategy,
+    RestApiInterfaceStrategy,
+)
 from app.patterns.command import CommandInvoker
 from app.patterns.memento import NoteCaretaker
 from app.patterns.receiver import NoteReceiver
@@ -18,9 +21,10 @@ from app.utils.logger_adapter import ConsoleLogTarget, FileLogTarget, LoggerAdap
 
 ACTIVE_STORAGE = "json"  # altere para "mem" durante testes
 ACTIVE_LOGGER = "console"  # altere para "file" para persistir logs
+ACTIVE_INTERFACE = "api"  # "gui" ou "api"
 
 
-def bootstrap_app() -> NotesAppGUI:
+def bootstrap() -> None:
     caretaker = NoteCaretaker()
 
     note_storage_options = {
@@ -34,11 +38,6 @@ def bootstrap_app() -> NotesAppGUI:
     logger_options = {
         "console": LoggerAdapter(ConsoleLogTarget()),
         "file": LoggerAdapter(FileLogTarget(Path("logs/app.log"))),
-    }
-    interface_options = {
-        "gui": NotesAppGUI,
-        "api": None,  # Futuramente, podemos adicionar uma interface RESTful
-        # "cli": NotesAppCLI,  # Futuramente, podemos adicionar uma interface de linha de comando
     }
 
     note_strategy = note_storage_options.get(
@@ -58,12 +57,16 @@ def bootstrap_app() -> NotesAppGUI:
     invoker = CommandInvoker(caretaker)
     sender = CommandSender(invoker)
 
-    return NotesAppGUI(sender, receiver, note_service, user_service)
+    interface_options = {
+        "gui": GuiInterfaceStrategy(),
+        "api": RestApiInterfaceStrategy(host="127.0.0.1", port=8000),
+    }
+    strategy = interface_options.get(ACTIVE_INTERFACE, GuiInterfaceStrategy())
+    strategy.run(sender, receiver, note_service, user_service)
 
 
 def main() -> None:
-    app = bootstrap_app()
-    app.run()
+    bootstrap()
 
 
 if __name__ == "__main__":

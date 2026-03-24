@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 from typing import List, Optional
 from uuid import uuid4
@@ -39,19 +38,17 @@ class NoteService:
         return note
 
     def attach_file(self, note_id: str, file_path: str) -> Note:
-        note = self._require(note_id)
         source = Path(file_path)
         if not source.exists():
             raise FileNotFoundError(file_path)
-        target_name = f"{note.note_id}_{source.name}"
-        target = UPLOAD_DIR / target_name
-        shutil.copy2(source, target)
-        if target_name not in note.attachments:
-            note.attachments.append(target_name)
-        note.touch()
-        self._repository.update(note)
-        self._log(f"Arquivo anexado em nota {note.note_id}: {target_name}")
-        return note
+        data = source.read_bytes()
+        return self.attach_bytes(note_id, source.name, data)
+
+    def attach_bytes(self, note_id: str, filename: str, payload: bytes) -> Note:
+        if not payload:
+            raise ValueError("Conteudo do arquivo vazio")
+        safe_name = filename or "attachment"
+        return self._store_attachment(note_id, safe_name, payload)
 
     def delete_note(self, note_id: str) -> None:
         note = self._require(note_id)
@@ -83,3 +80,17 @@ class NoteService:
 
     def _log(self, message: str) -> None:
         self._logger.info(message)
+
+    def _store_attachment(self, note_id: str, filename: str, payload: bytes) -> Note:
+        note = self._require(note_id)
+        base_name = Path(filename).name or "attachment"
+        target_name = f"{note.note_id}_{base_name}"
+        target = UPLOAD_DIR / target_name
+        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(payload)
+        if target_name not in note.attachments:
+            note.attachments.append(target_name)
+        note.touch()
+        self._repository.update(note)
+        self._log(f"Arquivo anexado em nota {note.note_id}: {target_name}")
+        return note

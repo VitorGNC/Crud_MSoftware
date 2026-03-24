@@ -75,6 +75,24 @@ class AttachFileCommand(BaseNoteCommand):
             return self.receiver.restore(memento)
 
 
+class AttachContentCommand(BaseNoteCommand):
+    def __init__(self, receiver: NoteReceiver, note_id: str, filename: str, payload: bytes) -> None:
+        super().__init__(receiver)
+        self.note_id = note_id
+        self.filename = filename
+        self.payload = payload
+
+    def snapshot(self) -> Optional[NoteMemento]:
+        return self.receiver.snapshot(self.note_id)
+
+    def execute(self):
+        return self.receiver.attach_from_bytes(self.note_id, self.filename, self.payload)
+
+    def undo(self, memento: Optional[NoteMemento]):
+        if memento:
+            return self.receiver.restore(memento)
+
+
 class DeleteNoteCommand(BaseNoteCommand):
     def __init__(self, receiver: NoteReceiver, note_id: str) -> None:
         super().__init__(receiver)
