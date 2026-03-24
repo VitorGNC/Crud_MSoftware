@@ -1,33 +1,44 @@
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
+"""Ponto de entrada do Notes App baseado em design patterns."""
 
-from app.database import Base, engine
-from app.views.login import router as alterar_infos_router
-from app.views.usuarios import router as gerenciar_usuarios_router
-from app.views.medias import router as medias_router
+from __future__ import annotations
 
-# Cria tabelas no banco (SQLite)
-Base.metadata.create_all(bind=engine)
+from pathlib import Path
 
-app = FastAPI(
-    title="Crud_MSoftware API",
-    description=(
-        "API REST no padrão MVC para gerenciamento de usuários e mídias.\n\n"
-        "**Usuário**: cadastro, edição de dados próprios, upload e exclusão de mídias.\n"
-        "**Administrador**: gerencia todos os usuários, altera permissões e visualiza mídias."
-    ),
-    version="1.0.0",
-)
-
-# Serve arquivos de upload como estáticos
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-
-# Routers
-app.include_router(alterar_infos_router)
-app.include_router(gerenciar_usuarios_router)
-app.include_router(medias_router)
+from app.interface.gui import NotesAppGUI
+from app.patterns.command import CommandInvoker
+from app.patterns.memento import NoteCaretaker
+from app.patterns.receiver import NoteReceiver
+from app.patterns.sender import CommandSender
+from app.repository.note_repository import NoteRepository
+from app.repository.strategies import InMemoryStorageStrategy, JsonStorageStrategy
+from app.services.note_service import NoteService
+from app.services.user_service import UserService
+from app.utils.logger_adapter import ConsoleLogTarget, FileLogTarget, LoggerAdapter
 
 
-@app.get("/", tags=["Root"])
-def root():
-    return {"message": "Crud_MSoftware API está no ar. Acesse /docs para a documentação."}
+def bootstrap_app() -> NotesAppGUI:
+    caretaker = NoteCaretaker()
+    notes_json = JsonStorageStrategy(Path("data/notes.json"))
+    repository = NoteRepository(notes_json)
+
+    console_logger = LoggerAdapter(ConsoleLogTarget())
+    file_logger = LoggerAdapter(FileLogTarget(Path("logs/app.log")))
+    note_service = NoteService(repository, [console_logger, file_logger])
+    note_service.register_strategy("json", notes_json)
+    note_service.register_strategy("mem", InMemoryStorageStrategy())
+
+    receiver = NoteReceiver(note_service)
+    invoker = CommandInvoker(caretaker)
+    sender = CommandSender(invoker)
+
+    user_service = UserService(Path("data/usuarios.json"))
+    return NotesAppGUI(sender, receiver, note_service, user_service)
+
+
+def main() -> None:
+    app = bootstrap_app()
+    app.run()
+
+
+if __name__ == "__main__":
+    main()
