@@ -32,7 +32,6 @@ class NotesAppGUI:
         self.current_user = None
         self.current_note_id: Optional[str] = None
         self.index_to_note: Dict[int, str] = {}
-        self.strategy_labels: Dict[str, str] = {}
 
         self.root = tk.Tk()
         self.root.title("Notes App - Design Patterns")
@@ -56,47 +55,76 @@ class NotesAppGUI:
         style.configure("Header.TLabel", font=("Helvetica", 16, "bold"))
 
     def _build_login_frame(self) -> None:
-        ttk.Label(self.login_frame, text="Notes App", style="Header.TLabel").grid(row=0, column=0, columnspan=2, pady=(0, 16))
+        ttk.Label(self.login_frame, text="Notes App", style="Header.TLabel").grid(
+            row=0, column=0, columnspan=2, pady=(0, 16)
+        )
 
         self.login_var = tk.StringVar()
         self.senha_var = tk.StringVar()
         self.email_var = tk.StringVar()
         self.nome_var = tk.StringVar()
         self.idade_var = tk.StringVar()
+        self.senha_registro_var = tk.StringVar()
+        self.login_registro_var = tk.StringVar()
 
         ttk.Label(self.login_frame, text="Login").grid(row=1, column=0, sticky="w")
-        ttk.Entry(self.login_frame, textvariable=self.login_var, width=30).grid(row=1, column=1, pady=4)
+        ttk.Entry(self.login_frame, textvariable=self.login_var, width=30).grid(
+            row=1, column=1, pady=4
+        )
 
         ttk.Label(self.login_frame, text="Senha").grid(row=2, column=0, sticky="w")
-        ttk.Entry(self.login_frame, textvariable=self.senha_var, show="*", width=30).grid(row=2, column=1, pady=4)
+        ttk.Entry(
+            self.login_frame, textvariable=self.senha_var, show="*", width=30
+        ).grid(row=2, column=1, pady=4)
 
-        ttk.Button(self.login_frame, text="Entrar", command=self._handle_login).grid(row=3, column=0, columnspan=2, pady=(12, 24), sticky="ew")
+        ttk.Button(self.login_frame, text="Entrar", command=self._handle_login).grid(
+            row=3, column=0, columnspan=2, pady=(12, 24), sticky="ew"
+        )
 
-        ttk.Separator(self.login_frame, orient="horizontal").grid(row=4, column=0, columnspan=2, sticky="ew", pady=12)
+        ttk.Separator(self.login_frame, orient="horizontal").grid(
+            row=4, column=0, columnspan=2, sticky="ew", pady=12
+        )
 
-        ttk.Label(self.login_frame, text="Registrar novo usuario", style="Header.TLabel").grid(row=5, column=0, columnspan=2, pady=(8, 12))
+        ttk.Label(
+            self.login_frame, text="Registrar novo usuario", style="Header.TLabel"
+        ).grid(row=5, column=0, columnspan=2, pady=(8, 12))
 
         ttk.Label(self.login_frame, text="Email").grid(row=6, column=0, sticky="w")
-        ttk.Entry(self.login_frame, textvariable=self.email_var, width=30).grid(row=6, column=1, pady=4)
+        ttk.Entry(self.login_frame, textvariable=self.email_var, width=30).grid(
+            row=6, column=1, pady=4
+        )
 
         ttk.Label(self.login_frame, text="Nome").grid(row=7, column=0, sticky="w")
-        ttk.Entry(self.login_frame, textvariable=self.nome_var, width=30).grid(row=7, column=1, pady=4)
+        ttk.Entry(self.login_frame, textvariable=self.nome_var, width=30).grid(
+            row=7, column=1, pady=4
+        )
 
         ttk.Label(self.login_frame, text="Idade").grid(row=8, column=0, sticky="w")
-        ttk.Entry(self.login_frame, textvariable=self.idade_var, width=30).grid(row=8, column=1, pady=4)
+        ttk.Entry(self.login_frame, textvariable=self.idade_var, width=30).grid(
+            row=8, column=1, pady=4
+        )
 
-        ttk.Button(self.login_frame, text="Registrar", command=self._handle_register).grid(row=9, column=0, columnspan=2, pady=(12, 0), sticky="ew")
+        ttk.Label(self.login_frame, text="Login").grid(row=9, column=0, sticky="w")
+        ttk.Entry(self.login_frame, textvariable=self.login_registro_var, width=30).grid(
+            row=9, column=1, pady=4
+        )
+
+        ttk.Label(self.login_frame, text="Senha").grid(
+            row=10, column=0, sticky="w"
+        )
+        
+        ttk.Entry(
+            self.login_frame, textvariable=self.senha_registro_var, show="*", width=30
+        ).grid(row=10, column=1, pady=4)
+
+        ttk.Button(
+            self.login_frame, text="Registrar", command=self._handle_register
+        ).grid(row=11, column=0, columnspan=2, pady=(12, 0), sticky="ew")
 
     def _build_notes_frame(self) -> None:
         top_bar = ttk.Frame(self.notes_frame)
         top_bar.pack(fill="x")
         ttk.Label(top_bar, text="Minhas notas", style="Header.TLabel").pack(side="left")
-
-        self.strategy_choice = tk.StringVar()
-        strategy_box = ttk.Combobox(top_bar, textvariable=self.strategy_choice, state="readonly", width=28)
-        strategy_box.pack(side="right")
-        strategy_box.bind("<<ComboboxSelected>>", self._switch_strategy)
-        self.strategy_box = strategy_box
 
         body = ttk.Frame(self.notes_frame)
         body.pack(fill="both", expand=True, pady=12)
@@ -106,7 +134,9 @@ class NotesAppGUI:
         self.notes_list = tk.Listbox(left, width=32, height=25)
         self.notes_list.pack(side="left", fill="y")
         self.notes_list.bind("<<ListboxSelect>>", self._select_note)
-        note_scroll = ttk.Scrollbar(left, orient="vertical", command=self.notes_list.yview)
+        note_scroll = ttk.Scrollbar(
+            left, orient="vertical", command=self.notes_list.yview
+        )
         note_scroll.pack(side="right", fill="y")
         self.notes_list.configure(yscrollcommand=note_scroll.set)
 
@@ -129,11 +159,21 @@ class NotesAppGUI:
 
         buttons = ttk.Frame(right)
         buttons.pack(fill="x", pady=12)
-        ttk.Button(buttons, text="Nova nota", command=self._new_note).pack(side="left", padx=4)
-        ttk.Button(buttons, text="Salvar", command=self._save_note).pack(side="left", padx=4)
-        ttk.Button(buttons, text="Anexar arquivo", command=self._attach_file).pack(side="left", padx=4)
-        ttk.Button(buttons, text="Excluir", command=self._delete_note).pack(side="left", padx=4)
-        ttk.Button(buttons, text="Desfazer", command=self._undo).pack(side="left", padx=4)
+        ttk.Button(buttons, text="Nova nota", command=self._new_note).pack(
+            side="left", padx=4
+        )
+        ttk.Button(buttons, text="Salvar", command=self._save_note).pack(
+            side="left", padx=4
+        )
+        ttk.Button(buttons, text="Anexar arquivo", command=self._attach_file).pack(
+            side="left", padx=4
+        )
+        ttk.Button(buttons, text="Excluir", command=self._delete_note).pack(
+            side="left", padx=4
+        )
+        ttk.Button(buttons, text="Desfazer", command=self._undo).pack(
+            side="left", padx=4
+        )
 
         history_frame = ttk.Frame(right)
         history_frame.pack(fill="both", expand=False)
@@ -148,24 +188,13 @@ class NotesAppGUI:
     def _show_notes(self) -> None:
         self.login_frame.pack_forget()
         self.notes_frame.pack(fill="both", expand=True)
-        self._populate_strategies()
         self._refresh_notes()
-
-    def _populate_strategies(self) -> None:
-        labels = []
-        self.strategy_labels.clear()
-        for name in self.note_service.available_strategies():
-            label = "In memory" if name == "mem" else "JSON persistente" if name == "json" else name
-            self.strategy_labels[label] = name
-            labels.append(label)
-        if labels:
-            self.strategy_box["values"] = labels
-            self.strategy_choice.set(labels[0])
-            self.note_service.use_strategy(self.strategy_labels[labels[0]])
 
     def _handle_login(self) -> None:
         try:
-            usuario = self.user_service.autenticar(self.login_var.get(), self.senha_var.get())
+            usuario = self.user_service.autenticar(
+                self.login_var.get(), self.senha_var.get()
+            )
         except UsuarioErro as exc:
             messagebox.showerror("Login", str(exc))
             return
@@ -181,8 +210,8 @@ class NotesAppGUI:
             return
         try:
             usuario = self.user_service.registrar(
-                login=self.login_var.get(),
-                senha=self.senha_var.get(),
+                login=self.login_registro_var.get(),
+                senha=self.senha_registro_var.get(),
                 email=self.email_var.get(),
                 nome=self.nome_var.get(),
                 idade=idade,
@@ -191,13 +220,6 @@ class NotesAppGUI:
             messagebox.showerror("Registro", str(exc))
             return
         messagebox.showinfo("Registro", f"Usuario {usuario.login} criado.")
-
-    def _switch_strategy(self, _event) -> None:
-        label = self.strategy_choice.get()
-        name = self.strategy_labels.get(label)
-        if name:
-            self.note_service.use_strategy(name)
-            self._refresh_notes()
 
     def _refresh_notes(self) -> None:
         if not self.current_user:
@@ -210,7 +232,9 @@ class NotesAppGUI:
             self.index_to_note[idx] = note.note_id
         self.history_box.delete(0, tk.END)
         self.attachments_list.delete(0, tk.END)
-        if self.current_note_id and not self.note_service.get_note(self.current_note_id):
+        if self.current_note_id and not self.note_service.get_note(
+            self.current_note_id
+        ):
             self.current_note_id = None
         if self.current_note_id:
             self._load_note(self.current_note_id)
@@ -256,9 +280,13 @@ class NotesAppGUI:
         title = self.title_var.get()
         content = self.content_text.get("1.0", tk.END)
         if self.current_note_id:
-            command = UpdateNoteCommand(self.receiver, self.current_note_id, title, content)
+            command = UpdateNoteCommand(
+                self.receiver, self.current_note_id, title, content
+            )
         else:
-            command = CreateNoteCommand(self.receiver, self.current_user.login, title, content)
+            command = CreateNoteCommand(
+                self.receiver, self.current_user.login, title, content
+            )
         try:
             self.sender.dispatch(command)
         except ValueError as exc:

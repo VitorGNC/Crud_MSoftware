@@ -85,10 +85,3 @@ class Usuario:
         data = dict(payload)
         data["criado_em"] = datetime.fromisoformat(payload["criado_em"]) if "criado_em" in payload else datetime.utcnow()
         return cls(**data)
-    ativo: bool
-
-    model_config = {"from_attributes": True}
-
-
-class AlterarPermissaoSchema(BaseModel):
-    is_admin: bool

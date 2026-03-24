@@ -2,36 +2,21 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import List, Optional
 from uuid import uuid4
 
 from app.models.note import Note
 from app.repository.note_repository import NoteRepository
-from app.repository.strategies import StorageStrategy
 from app.utils.logger_adapter import LoggerAdapter
 
 UPLOAD_DIR = Path("uploads")
 
 
 class NoteService:
-    def __init__(self, repository: NoteRepository, loggers: Iterable[LoggerAdapter]) -> None:
+    def __init__(self, repository: NoteRepository, logger: LoggerAdapter) -> None:
         self._repository = repository
-        self._loggers = list(loggers)
-        self._strategies: Dict[str, StorageStrategy] = {}
+        self._logger = logger
         UPLOAD_DIR.mkdir(exist_ok=True)
-
-    def register_strategy(self, name: str, strategy: StorageStrategy) -> None:
-        self._strategies[name] = strategy
-
-    def available_strategies(self) -> List[str]:
-        return list(self._strategies.keys())
-
-    def use_strategy(self, name: str) -> None:
-        strategy = self._strategies.get(name)
-        if not strategy:
-            raise ValueError(f"Estrategia {name} nao cadastrada")
-        self._repository.set_strategy(strategy)
-        self._log(f"Estrategia de armazenamento ativa: {name}")
 
     def create_note(self, owner: str, title: str, content: str) -> Note:
         note = Note(
@@ -97,5 +82,4 @@ class NoteService:
         return note
 
     def _log(self, message: str) -> None:
-        for logger in self._loggers:
-            logger.info(message)
+        self._logger.info(message)

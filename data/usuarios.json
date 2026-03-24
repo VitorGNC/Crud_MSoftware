@@ -1,0 +1,12 @@
+[
+  {
+    "login": "admin",
+    "nome": "admin name dasd as sad sads adsad as d ssas ds asad sad sd a",
+    "email": "admin@admin.com",
+    "senha_hash": "12306b8682aa96a7$b3660fdd1b1d773372953bc6da7ec45a942a5509d8eb8178cbaae86b18476109",
+    "idade": 123,
+    "is_admin": false,
+    "ativo": true,
+    "criado_em": "2026-03-24T03:21:02.654451"
+  }
+]
