@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
 from app.models.usuario import UsuarioErro
@@ -42,6 +43,8 @@ def create_api_app(sender, receiver, note_service, user_service) -> FastAPI:
         version="2.0.0",
     )
 
+    security = HTTPBasic()
+
     def _auth(login: str, senha: str):
         try:
             return user_service.autenticar(login, senha)
@@ -74,8 +77,8 @@ def create_api_app(sender, receiver, note_service, user_service) -> FastAPI:
         return {"message": "Login valido."}
 
     @app.get("/notes", tags=["Notes"])
-    def list_notes(login: str, senha: str):
-        usuario = _auth(login, senha)
+    def list_notes(credentials: HTTPBasicCredentials = Depends(security)):
+        usuario = _auth(credentials.username, credentials.password)
         notes = note_service.list_notes(usuario.login)
         return [note.to_dict() for note in notes]
 
@@ -98,8 +101,8 @@ def create_api_app(sender, receiver, note_service, user_service) -> FastAPI:
         return {"message": "Nota atualizada.", "note": note.to_dict()}
 
     @app.delete("/notes/{note_id}", tags=["Notes"])
-    def delete_note(note_id: str, login: str, senha: str):
-        usuario = _auth(login, senha)
+    def delete_note(note_id: str, credentials: HTTPBasicCredentials = Depends(security)):
+        usuario = _auth(credentials.username, credentials.password)
         _require_note(note_id, usuario.login)
         command = DeleteNoteCommand(receiver, note_id)
         try:
@@ -132,8 +135,8 @@ def create_api_app(sender, receiver, note_service, user_service) -> FastAPI:
         }
 
     @app.get("/notes/{note_id}/history", tags=["History"])
-    def note_history(note_id: str, login: str, senha: str):
-        usuario = _auth(login, senha)
+    def note_history(note_id: str, credentials: HTTPBasicCredentials = Depends(security)):
+        usuario = _auth(credentials.username, credentials.password)
         _require_note(note_id, usuario.login)
         history = sender.history_for(note_id) or []
         return [
@@ -142,8 +145,8 @@ def create_api_app(sender, receiver, note_service, user_service) -> FastAPI:
         ]
 
     @app.post("/commands/undo", tags=["History"])
-    def undo_command(login: str, senha: str):
-        _auth(login, senha)
+    def undo_command(credentials: HTTPBasicCredentials = Depends(security)):
+        _auth(credentials.username, credentials.password)
         if not sender.undo_last():
             raise HTTPException(status_code=400, detail="Nao ha operacoes para desfazer.")
         return {"message": "Ultima operacao desfeita."}
