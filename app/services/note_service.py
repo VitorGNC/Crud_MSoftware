@@ -9,6 +9,7 @@ from app.repository.note_repository import NoteRepository
 from app.utils.logger_adapter import LoggerAdapter
 
 UPLOAD_DIR = Path("uploads")
+MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
 class NoteService:
@@ -47,6 +48,8 @@ class NoteService:
     def attach_bytes(self, note_id: str, filename: str, payload: bytes) -> Note:
         if not payload:
             raise ValueError("Conteudo do arquivo vazio")
+        if len(payload) > MAX_ATTACHMENT_SIZE:
+            raise ValueError(f"Arquivo excede o limite de {MAX_ATTACHMENT_SIZE // (1024 * 1024)} MB")
         safe_name = filename or "attachment"
         return self._store_attachment(note_id, safe_name, payload)
 
