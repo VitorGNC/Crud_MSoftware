@@ -125,9 +125,9 @@ def create_api_app(sender, receiver, note_service, user_service) -> FastAPI:
         try:
             note = sender.dispatch(command)
         except ValueError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
-        except Exception as exc:  # noqa: BLE001 - garantir mensagem amigavel
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except (IOError, OSError) as exc:
+            raise HTTPException(status_code=500, detail="Erro ao salvar arquivo no servidor.") from exc
         return {
             "message": "Arquivo anexado.",
             "attachments": note.attachments,
