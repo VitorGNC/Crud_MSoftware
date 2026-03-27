@@ -18,6 +18,7 @@ from app.repository.user_repository import UserRepository
 from app.services.note_service import NoteService
 from app.services.user_service import UserService
 from app.utils.logger_adapter import ConsoleLogTarget, FileLogTarget, LoggerAdapter
+from app.patterns.observer import LogNoteObserver, NoteEventBus
 
 ACTIVE_STORAGE = "json"  # altere para "mem" durante testes
 ACTIVE_LOGGER = "console"  # altere para "file" para persistir logs
@@ -25,6 +26,8 @@ ACTIVE_INTERFACE = "api"  # "gui" ou "api"
 
 
 def bootstrap() -> None:
+    NoteEventBus.registrar(LogNoteObserver())
+
     caretaker = NoteCaretaker()
 
     note_storage_options = {

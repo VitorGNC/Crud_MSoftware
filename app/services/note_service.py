@@ -5,6 +5,7 @@ from typing import List, Optional
 from uuid import uuid4
 
 from app.models.note import Note
+from app.patterns.observer import EventoNota, NoteEventBus
 from app.repository.note_repository import NoteRepository
 from app.utils.logger_adapter import LoggerAdapter
 
@@ -27,6 +28,7 @@ class NoteService:
         )
         self._repository.create(note)
         self._log(f"Usuario {owner} criou a nota {note.note_id}")
+        NoteEventBus.emitir(EventoNota.CRIADA, {"note_id": note.note_id, "owner": owner})
         return note
 
     def update_note(self, note_id: str, title: str, content: str) -> Note:
@@ -36,6 +38,7 @@ class NoteService:
         note.touch()
         self._repository.update(note)
         self._log(f"Usuario {note.owner} atualizou a nota {note.note_id}")
+        NoteEventBus.emitir(EventoNota.ATUALIZADA, {"note_id": note.note_id, "owner": note.owner})
         return note
 
     def attach_file(self, note_id: str, file_path: str) -> Note:
@@ -57,6 +60,7 @@ class NoteService:
         note = self._require(note_id)
         self._repository.remove(note.note_id)
         self._log(f"Nota {note.note_id} removida por {note.owner}")
+        NoteEventBus.emitir(EventoNota.REMOVIDA, {"note_id": note.note_id, "owner": note.owner})
 
     def list_notes(self, owner: str) -> List[Note]:
         notes = self._repository.list_by_owner(owner)
