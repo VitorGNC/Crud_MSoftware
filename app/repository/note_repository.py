@@ -44,7 +44,9 @@ class NoteRepository:
         return note
 
     def remove(self, note_id: str) -> None:
-        self._notes.pop(note_id, None)
+        if note_id not in self._notes:
+            raise KeyError(f"Nota {note_id} nao encontrada")
+        del self._notes[note_id]
         self._persist()
 
     def list_by_owner(self, owner: str) -> List[Note]:

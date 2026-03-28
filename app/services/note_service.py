@@ -93,7 +93,6 @@ class NoteService:
         base_name = Path(filename).name or "attachment"
         target_name = f"{note.note_id}_{base_name}"
         target = UPLOAD_DIR / target_name
-        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         target.write_bytes(payload)
         if target_name not in note.attachments:
             note.attachments.append(target_name)
