@@ -5,12 +5,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
 from app.models.usuario import UsuarioErro
-from app.patterns.command import (
-    AttachContentCommand,
-    CreateNoteCommand,
-    DeleteNoteCommand,
-    UpdateNoteCommand,
-)
+from app.patterns.factory import CommandFactory
 
 
 class RegisterPayload(BaseModel):
@@ -37,6 +32,8 @@ class NoteUpdatePayload(CredentialsPayload):
 
 
 def create_api_app(sender, receiver, note_service, user_service) -> FastAPI:
+    factory = CommandFactory(receiver)
+
     app = FastAPI(
         title="Notes App API",
         description="Interface REST com Swagger para o Notes App",
@@ -85,7 +82,7 @@ def create_api_app(sender, receiver, note_service, user_service) -> FastAPI:
     @app.post("/notes", tags=["Notes"])
     def create_note(payload: NotePayload):
         usuario = _auth(payload.login, payload.senha)
-        command = CreateNoteCommand(receiver, usuario.login, payload.title, payload.content)
+        command = factory.create_note(usuario.login, payload.title, payload.content)
         note = sender.dispatch(command)
         return {"message": "Nota criada.", "note_id": note.note_id}
 
@@ -93,7 +90,7 @@ def create_api_app(sender, receiver, note_service, user_service) -> FastAPI:
     def update_note(note_id: str, payload: NoteUpdatePayload):
         usuario = _auth(payload.login, payload.senha)
         _require_note(note_id, usuario.login)
-        command = UpdateNoteCommand(receiver, note_id, payload.title, payload.content)
+        command = factory.update_note(note_id, payload.title, payload.content)
         try:
             note = sender.dispatch(command)
         except ValueError as exc:
@@ -104,7 +101,7 @@ def create_api_app(sender, receiver, note_service, user_service) -> FastAPI:
     def delete_note(note_id: str, credentials: HTTPBasicCredentials = Depends(security)):
         usuario = _auth(credentials.username, credentials.password)
         _require_note(note_id, usuario.login)
-        command = DeleteNoteCommand(receiver, note_id)
+        command = factory.delete_note(note_id)
         try:
             sender.dispatch(command)
         except ValueError as exc:
@@ -121,7 +118,7 @@ def create_api_app(sender, receiver, note_service, user_service) -> FastAPI:
         usuario = _auth(login, senha)
         _require_note(note_id, usuario.login)
         payload = await arquivo.read()
-        command = AttachContentCommand(receiver, note_id, arquivo.filename or "attachment", payload)
+        command = factory.attach_content(note_id, arquivo.filename or "attachment", payload)
         try:
             note = sender.dispatch(command)
         except ValueError as exc:

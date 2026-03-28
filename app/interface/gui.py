@@ -5,12 +5,7 @@ from tkinter import filedialog, messagebox, ttk
 from typing import Dict, Optional
 
 from app.models.usuario import UsuarioErro
-from app.patterns.command import (
-    AttachFileCommand,
-    CreateNoteCommand,
-    DeleteNoteCommand,
-    UpdateNoteCommand,
-)
+from app.patterns.factory import CommandFactory
 from app.patterns.receiver import NoteReceiver
 from app.patterns.sender import CommandSender
 from app.services.note_service import NoteService
@@ -27,6 +22,7 @@ class NotesAppGUI:
     ) -> None:
         self.sender = sender
         self.receiver = receiver
+        self.factory = CommandFactory(receiver)
         self.note_service = note_service
         self.user_service = user_service
         self.current_user = None
@@ -280,13 +276,9 @@ class NotesAppGUI:
         title = self.title_var.get()
         content = self.content_text.get("1.0", tk.END)
         if self.current_note_id:
-            command = UpdateNoteCommand(
-                self.receiver, self.current_note_id, title, content
-            )
+            command = self.factory.update_note(self.current_note_id, title, content)
         else:
-            command = CreateNoteCommand(
-                self.receiver, self.current_user.login, title, content
-            )
+            command = self.factory.create_note(self.current_user.login, title, content)
         try:
             self.sender.dispatch(command)
         except ValueError as exc:
@@ -301,7 +293,7 @@ class NotesAppGUI:
         file_path = filedialog.askopenfilename(title="Selecione um arquivo")
         if not file_path:
             return
-        command = AttachFileCommand(self.receiver, self.current_note_id, file_path)
+        command = self.factory.attach_file(self.current_note_id, file_path)
         try:
             self.sender.dispatch(command)
         except FileNotFoundError:
@@ -314,7 +306,7 @@ class NotesAppGUI:
             return
         if not messagebox.askyesno("Excluir", "Deseja remover esta nota?"):
             return
-        command = DeleteNoteCommand(self.receiver, self.current_note_id)
+        command = self.factory.delete_note(self.current_note_id)
         self.sender.dispatch(command)
         self._new_note()
         self._refresh_notes()
