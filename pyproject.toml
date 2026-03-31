@@ -1,0 +1,18 @@
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",   # erros de estilo (pycodestyle)
+    "F",   # erros logicos (pyflakes)
+    "I",   # ordem de imports (isort)
+    "UP",  # modernizacao de sintaxe (pyupgrade)
+]
+ignore = [
+    "E501",  # linha longa — ruff ja controla via line-length
+]
+exclude = ["CRUD.py"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

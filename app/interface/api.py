@@ -148,4 +148,12 @@ def create_api_app(sender, receiver, note_service, user_service) -> FastAPI:
             raise HTTPException(status_code=400, detail="Nao ha operacoes para desfazer.")
         return {"message": "Ultima operacao desfeita."}
 
+    @app.get("/users", tags=["Admin"])
+    def list_users(credentials: HTTPBasicCredentials = Depends(security)):
+        usuario = _auth(credentials.username, credentials.password)
+        if not usuario.is_admin:
+            raise HTTPException(status_code=403, detail="Acesso restrito a administradores.")
+        users = user_service.listar()
+        return [u.to_dict() for u in users.values()]
+
     return app
