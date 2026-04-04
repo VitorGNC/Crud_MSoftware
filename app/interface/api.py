@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from app.models.usuario import UsuarioErro
 from app.patterns.factory import CommandFactory
+from app.patterns.observer import NoteEventBus
 
 
 class RegisterPayload(BaseModel):
@@ -147,6 +148,13 @@ def create_api_app(sender, receiver, note_service, user_service) -> FastAPI:
         if not sender.undo_last():
             raise HTTPException(status_code=400, detail="Nao ha operacoes para desfazer.")
         return {"message": "Ultima operacao desfeita."}
+
+    @app.get("/stats", tags=["Admin"])
+    def get_stats(credentials: HTTPBasicCredentials = Depends(security)):
+        usuario = _auth(credentials.username, credentials.password)
+        if not usuario.is_admin:
+            raise HTTPException(status_code=403, detail="Acesso restrito a administradores.")
+        return NoteEventBus.get_stats()
 
     @app.get("/users", tags=["Admin"])
     def list_users(credentials: HTTPBasicCredentials = Depends(security)):
