@@ -5,12 +5,15 @@ from typing import List, Optional
 from uuid import uuid4
 
 from app.models.note import Note
+from app.patterns.chain import build_attachment_chain
 from app.patterns.observer import EventoNota, NoteEventBus
 from app.repository.note_repository import NoteRepository
 from app.utils.logger_adapter import LoggerAdapter
 
 UPLOAD_DIR = Path("uploads")
 MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024  # 10 MB
+
+_attachment_chain = build_attachment_chain(MAX_ATTACHMENT_SIZE)
 
 
 class NoteService:
@@ -49,11 +52,8 @@ class NoteService:
         return self.attach_bytes(note_id, source.name, data)
 
     def attach_bytes(self, note_id: str, filename: str, payload: bytes) -> Note:
-        if not payload:
-            raise ValueError("Conteudo do arquivo vazio")
-        if len(payload) > MAX_ATTACHMENT_SIZE:
-            raise ValueError(f"Arquivo excede o limite de {MAX_ATTACHMENT_SIZE // (1024 * 1024)} MB")
         safe_name = filename or "attachment"
+        _attachment_chain.handle(safe_name, payload)
         return self._store_attachment(note_id, safe_name, payload)
 
     def delete_note(self, note_id: str) -> None:

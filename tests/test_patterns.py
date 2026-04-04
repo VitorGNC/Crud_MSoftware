@@ -7,6 +7,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.models.note import Note
+from app.patterns.chain import (
+    ContentValidator,
+    FormatValidator,
+    SizeValidator,
+    build_attachment_chain,
+)
 from app.patterns.command import (
     CommandInvoker,
     CreateNoteCommand,
@@ -52,6 +58,64 @@ def limpar_observers():
     NoteEventBus._observadores.clear()
     yield
     NoteEventBus._observadores.clear()
+
+
+# ---------------------------------------------------------------------------
+# Chain of Responsibility
+# ---------------------------------------------------------------------------
+
+class TestContentValidator:
+    def test_payload_vazio_lanca_erro(self):
+        v = ContentValidator()
+        with pytest.raises(ValueError, match="vazio"):
+            v.handle("arquivo.txt", b"")
+
+    def test_payload_valido_passa(self):
+        v = ContentValidator()
+        v.handle("arquivo.txt", b"conteudo")  # sem erro
+
+
+class TestSizeValidator:
+    def test_acima_do_limite_lanca_erro(self):
+        v = SizeValidator(max_bytes=10)
+        with pytest.raises(ValueError, match="limite"):
+            v.handle("arquivo.txt", b"x" * 11)
+
+    def test_dentro_do_limite_passa(self):
+        v = SizeValidator(max_bytes=10)
+        v.handle("arquivo.txt", b"x" * 10)  # sem erro
+
+
+class TestFormatValidator:
+    def test_extensao_invalida_lanca_erro(self):
+        v = FormatValidator()
+        with pytest.raises(ValueError, match="nao permitido"):
+            v.handle("malware.exe", b"conteudo")
+
+    def test_extensao_valida_passa(self):
+        v = FormatValidator()
+        v.handle("imagem.tif", b"conteudo")  # sem erro
+
+
+class TestAttachmentChain:
+    def test_cadeia_rejeita_payload_vazio(self):
+        chain = build_attachment_chain(max_bytes=1024)
+        with pytest.raises(ValueError, match="vazio"):
+            chain.handle("arquivo.txt", b"")
+
+    def test_cadeia_rejeita_arquivo_grande(self):
+        chain = build_attachment_chain(max_bytes=5)
+        with pytest.raises(ValueError, match="limite"):
+            chain.handle("arquivo.txt", b"x" * 6)
+
+    def test_cadeia_rejeita_formato_invalido(self):
+        chain = build_attachment_chain(max_bytes=1024)
+        with pytest.raises(ValueError, match="nao permitido"):
+            chain.handle("virus.bat", b"conteudo")
+
+    def test_cadeia_aceita_arquivo_valido(self):
+        chain = build_attachment_chain(max_bytes=1024)
+        chain.handle("mapa.tif", b"conteudo")  # sem erro
 
 
 # ---------------------------------------------------------------------------
