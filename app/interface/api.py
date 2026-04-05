@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
 from app.models.usuario import UsuarioErro
+from app.patterns.export import PdfNoteExporter, PlainTextNoteExporter
 from app.patterns.factory import CommandFactory
 from app.patterns.observer import NoteEventBus
 
@@ -148,6 +150,36 @@ def create_api_app(sender, receiver, note_service, user_service) -> FastAPI:
         if not sender.undo_last():
             raise HTTPException(status_code=400, detail="Nao ha operacoes para desfazer.")
         return {"message": "Ultima operacao desfeita."}
+
+    @app.get("/notes/{note_id}/export", tags=["Notes"])
+    def export_note(
+        note_id: str,
+        formato: str = Query(default="pdf", pattern="^(pdf|txt)$"),
+        credentials: HTTPBasicCredentials = Depends(security),
+    ):
+        usuario = _auth(credentials.username, credentials.password)
+        _require_note(note_id, usuario.login)
+
+        exporter = PdfNoteExporter() if formato == "pdf" else PlainTextNoteExporter()
+        media_type = "application/pdf" if formato == "pdf" else "text/plain"
+        extension = formato
+
+        try:
+            content = note_service.export_note(note_id, exporter)
+        except ImportError:
+            raise HTTPException(
+                status_code=501,
+                detail="Dependencia 'fpdf2' nao instalada. Execute: pip install fpdf2",
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        filename = f"nota_{note_id[:8]}.{extension}"
+        return Response(
+            content=content,
+            media_type=media_type,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
 
     @app.get("/stats", tags=["Admin"])
     def get_stats(credentials: HTTPBasicCredentials = Depends(security)):

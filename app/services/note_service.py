@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from uuid import uuid4
 
 from app.models.note import Note
@@ -9,6 +9,9 @@ from app.patterns.chain import build_attachment_chain
 from app.patterns.observer import EventoNota, NoteEventBus
 from app.repository.note_repository import NoteRepository
 from app.utils.logger_adapter import LoggerAdapter
+
+if TYPE_CHECKING:
+    from app.patterns.export import NoteExporter
 
 UPLOAD_DIR = Path("uploads")
 MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024  # 10 MB
@@ -78,6 +81,11 @@ class NoteService:
     def snapshot(self, note_id: str) -> Optional[Note]:
         note = self._repository.get(note_id)
         return note.clone() if note else None
+
+    def export_note(self, note_id: str, exporter: "NoteExporter") -> bytes:
+        note = self._require(note_id)
+        self._log(f"Exportando nota {note_id} via {type(exporter).__name__}")
+        return exporter.export(note)
 
     def _require(self, note_id: str) -> Note:
         note = self._repository.get(note_id)

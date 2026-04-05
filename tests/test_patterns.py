@@ -14,6 +14,7 @@ from app.patterns.chain import (
     build_attachment_chain,
 )
 from app.patterns.command import (
+    AttachContentCommand,
     CommandInvoker,
     CreateNoteCommand,
     DeleteNoteCommand,
@@ -368,3 +369,169 @@ class TestCommandSender:
         sender.dispatch(factory.update_note(note.note_id, "Novo", "Conteudo"))
         history = sender.history_for(note.note_id)
         assert len(history) >= 1
+
+
+# ---------------------------------------------------------------------------
+# AttachContentCommand
+# ---------------------------------------------------------------------------
+
+class TestAttachContentCommand:
+    def test_execute_anexa_arquivo_na_nota(self):
+        receiver = make_receiver()
+        note = receiver.create("joao", "Titulo", "Conteudo")
+        cmd = AttachContentCommand(receiver, note.note_id, "doc.txt", b"conteudo do arquivo")
+        atualizada = cmd.execute()
+        assert any("doc.txt" in a for a in atualizada.attachments)
+
+    def test_snapshot_captura_estado_antes_do_anexo(self):
+        receiver = make_receiver()
+        note = receiver.create("joao", "Titulo", "Conteudo")
+        cmd = AttachContentCommand(receiver, note.note_id, "doc.txt", b"conteudo")
+        memento = cmd.snapshot()
+        assert memento is not None
+        assert memento.state["attachments"] == []
+
+    def test_undo_remove_anexo_adicionado(self):
+        receiver = make_receiver()
+        note = receiver.create("joao", "Titulo", "Conteudo")
+        cmd = AttachContentCommand(receiver, note.note_id, "doc.txt", b"conteudo")
+        memento = cmd.snapshot()
+        cmd.execute()
+        cmd.undo(memento)
+        restaurada = receiver._service.get_note(note.note_id)
+        assert restaurada.attachments == []
+
+    def test_formato_invalido_lanca_erro(self):
+        receiver = make_receiver()
+        note = receiver.create("joao", "Titulo", "Conteudo")
+        cmd = AttachContentCommand(receiver, note.note_id, "virus.exe", b"conteudo")
+        with pytest.raises(ValueError, match="nao permitido"):
+            cmd.execute()
+
+    def test_payload_vazio_lanca_erro(self):
+        receiver = make_receiver()
+        note = receiver.create("joao", "Titulo", "Conteudo")
+        cmd = AttachContentCommand(receiver, note.note_id, "doc.txt", b"")
+        with pytest.raises(ValueError, match="vazio"):
+            cmd.execute()
+
+
+# ---------------------------------------------------------------------------
+# CommandInvoker (direto)
+# ---------------------------------------------------------------------------
+
+class TestCommandInvoker:
+    def _make_invoker(self):
+        return CommandInvoker(NoteCaretaker())
+
+    def test_execute_retorna_resultado_do_comando(self):
+        receiver = make_receiver()
+        invoker = self._make_invoker()
+        cmd = CreateNoteCommand(receiver, "joao", "Titulo", "Conteudo")
+        note = invoker.execute(cmd)
+        assert note.title == "Titulo"
+
+    def test_execute_com_snapshot_empilha_no_caretaker(self):
+        receiver = make_receiver()
+        invoker = self._make_invoker()
+        note = invoker.execute(CreateNoteCommand(receiver, "joao", "T", "C"))
+        invoker.execute(UpdateNoteCommand(receiver, note.note_id, "Novo", "C"))
+        history = invoker.history_for(note.note_id)
+        assert len(history) == 1
+
+    def test_undo_last_apos_criacao_remove_nota(self):
+        receiver = make_receiver()
+        invoker = self._make_invoker()
+        note = invoker.execute(CreateNoteCommand(receiver, "joao", "T", "C"))
+        invoker.undo_last()
+        assert receiver._service.get_note(note.note_id) is None
+
+    def test_undo_last_apos_atualizacao_restaura_titulo(self):
+        receiver = make_receiver()
+        invoker = self._make_invoker()
+        note = invoker.execute(CreateNoteCommand(receiver, "joao", "Original", "C"))
+        invoker.execute(UpdateNoteCommand(receiver, note.note_id, "Alterado", "C"))
+        invoker.undo_last()
+        restaurada = receiver._service.get_note(note.note_id)
+        assert restaurada.title == "Original"
+
+    def test_undo_last_apos_delecao_restaura_nota(self):
+        receiver = make_receiver()
+        invoker = self._make_invoker()
+        note = invoker.execute(CreateNoteCommand(receiver, "joao", "Titulo", "C"))
+        invoker.execute(DeleteNoteCommand(receiver, note.note_id))
+        invoker.undo_last()
+        assert receiver._service.get_note(note.note_id) is not None
+
+    def test_undo_last_sem_historico_retorna_false(self):
+        invoker = self._make_invoker()
+        assert invoker.undo_last() is False
+
+    def test_undo_encadeado_multiplas_atualizacoes(self):
+        receiver = make_receiver()
+        invoker = self._make_invoker()
+        note = invoker.execute(CreateNoteCommand(receiver, "joao", "V1", "C"))
+        invoker.execute(UpdateNoteCommand(receiver, note.note_id, "V2", "C"))
+        invoker.execute(UpdateNoteCommand(receiver, note.note_id, "V3", "C"))
+
+        invoker.undo_last()
+        assert receiver._service.get_note(note.note_id).title == "V2"
+
+        invoker.undo_last()
+        assert receiver._service.get_note(note.note_id).title == "V1"
+
+    def test_history_for_retorna_lista_vazia_sem_updates(self):
+        receiver = make_receiver()
+        invoker = self._make_invoker()
+        invoker.execute(CreateNoteCommand(receiver, "joao", "Titulo", "C"))
+        # CreateNoteCommand não gera snapshot, logo history deve ser vazia
+        history = invoker.history_for("qualquer-id")
+        assert history == []
+
+
+# ---------------------------------------------------------------------------
+# NoteCaretaker — casos de borda
+# ---------------------------------------------------------------------------
+
+class TestNoteCaretakerEdgeCases:
+    def test_multiplos_pushes_mesma_nota_history_for_retorna_todos(self):
+        caretaker = NoteCaretaker()
+        note = make_note("n1")
+        m1 = NoteMemento.from_note(note)
+        note.title = "V2"
+        m2 = NoteMemento.from_note(note)
+        caretaker.push(m1)
+        caretaker.push(m2)
+        history = caretaker.history_for("n1")
+        assert len(history) == 2
+
+    def test_pop_em_sequencia_respeita_lifo(self):
+        caretaker = NoteCaretaker()
+        note = make_note("n1")
+        m1 = NoteMemento.from_note(note)
+        note.title = "V2"
+        m2 = NoteMemento.from_note(note)
+        caretaker.push(m1)
+        caretaker.push(m2)
+        _, primeiro = caretaker.pop()
+        assert primeiro.state["title"] == "V2"
+        _, segundo = caretaker.pop()
+        assert segundo.state["title"] == "Titulo"
+
+    def test_history_for_nota_inexistente_retorna_lista_vazia(self):
+        caretaker = NoteCaretaker()
+        assert caretaker.history_for("nao-existe") == []
+
+    def test_notas_diferentes_nao_se_misturam(self):
+        caretaker = NoteCaretaker()
+        caretaker.push(NoteMemento.from_note(make_note("n1")))
+        caretaker.push(NoteMemento.from_note(make_note("n2")))
+        caretaker.push(NoteMemento.from_note(make_note("n1")))
+        assert len(caretaker.history_for("n1")) == 2
+        assert len(caretaker.history_for("n2")) == 1
+
+    def test_pop_limpa_entry_apos_ultimo_memento_da_nota(self):
+        caretaker = NoteCaretaker()
+        caretaker.push(NoteMemento.from_note(make_note("n1")))
+        caretaker.pop()
+        assert "n1" not in caretaker._by_note

@@ -58,6 +58,7 @@ Ubuntu/Debian: sudo apt install python3-tk
 - **Repository + Strategy**: `NoteRepository` e `UserRepository` aplicam as estrategias `JsonStorageStrategy` e `InMemoryStorageStrategy` ([app/repository/strategies.py](app/repository/strategies.py)), selecionadas no bootstrap via `ACTIVE_STORAGE`.
 - **Adapter**: `LoggerAdapter` isola diferentes destinos de log (console e arquivo), mantendo interface unica para todos os serviços.
 - **Interface Strategy**: `GuiInterfaceStrategy` e `RestApiInterfaceStrategy` ([app/interface/interface_strategy.py](app/interface/interface_strategy.py)) alternam entre a GUI e a API FastAPI com Swagger.
+- **Template Method**: `NoteExporter` ([app/patterns/export.py](app/patterns/export.py)) define o esqueleto da exportacao em quatro passos fixos (`_setup` → `_write_header` → `_write_body` → `_write_footer` → `_build`). `PdfNoteExporter` gera PDF via `fpdf2` e `PlainTextNoteExporter` gera texto simples. Novas saidas (HTML, DOCX etc.) precisam apenas de uma nova subclasse.
 
 ## Funcionalidades principais
 
@@ -76,6 +77,7 @@ Ubuntu/Debian: sudo apt install python3-tk
 - `POST /notes/{note_id}/attachments`: upload multipart (`arquivo`) para anexar arquivos e sincronizar com `uploads/`.
 - `GET /notes/{note_id}/history`: retorna o historico de mementos gravados pelo CommandInvoker.
 - `POST /commands/undo`: desfaz a ultima operacao, replicando o botao **Desfazer** da GUI.
+- `GET /notes/{note_id}/export?formato=pdf`: exporta a nota como PDF (padrao) ou texto simples (`formato=txt`).
 
 ## Estrategia de log
 
@@ -93,7 +95,7 @@ Ubuntu/Debian: sudo apt install python3-tk
 
 ## Proximos passos possiveis
 
-- Adicionar exportacao de nota em PDF usando Template Method.
 - Expandir o Adapter de logs para integracoes remotas (HTTP, syslog etc).
-- Criar testes automatizados para os comandos e para o caretaker.
+- Adicionar subclasse `HtmlNoteExporter` em [app/patterns/export.py](app/patterns/export.py) reaproveitando o Template Method ja existente.
+- Suporte a busca full-text nas notas (Decorator sobre NoteRepository).
 
