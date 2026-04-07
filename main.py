@@ -22,8 +22,10 @@ from app.patterns.observer import (
 from app.repository.note_repository import NoteRepository
 from app.repository.satellite_repository import SatelliteRepository
 from app.repository.strategies import InMemoryStorageStrategy, JsonStorageStrategy
+from app.repository.talhao_repository import TalhaoRepository
 from app.repository.user_repository import UserRepository
 from app.services.note_service import NoteService
+from app.services.talhao_service import TalhaoService
 from app.services.satellite_service import SatelliteService
 from app.services.user_service import UserService
 from app.utils.logger_adapter import ConsoleLogTarget, FileLogTarget, LoggerAdapter
@@ -57,6 +59,7 @@ def bootstrap() -> None:
     )
     note_repository = NoteRepository(note_strategy)
     user_repository = UserRepository(user_strategy)
+    talhao_repository = TalhaoRepository(JsonStorageStrategy(Path("data/talhoes.json")))
 
     logger_adapter = logger_options.get(ACTIVE_LOGGER, logger_options["console"])
 
@@ -66,6 +69,7 @@ def bootstrap() -> None:
 
     note_service = NoteService(note_repository, logger_adapter)
     user_service = UserService(user_repository, logger_adapter)
+    talhao_service = TalhaoService(talhao_repository)
 
     satellite_repository = SatelliteRepository(Path("data/satellite"))
     satellite_service = SatelliteService(satellite_repository, logger_adapter)
@@ -79,7 +83,7 @@ def bootstrap() -> None:
         "api": RestApiInterfaceStrategy(host="127.0.0.1", port=8000),
     }
     strategy = interface_options.get(ACTIVE_INTERFACE, GuiInterfaceStrategy())
-    strategy.run(sender, receiver, note_service, user_service, satellite_service)
+    strategy.run(sender, receiver, note_service, user_service, talhao_service, satelite_service)
 
 
 def main() -> None:
