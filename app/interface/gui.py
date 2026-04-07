@@ -161,7 +161,6 @@ class NotesAppGUI:
 
         nav_items = [
             ("Anotacoes", "notes"),
-            ("Upload Imagem Drone", "upload_drone"),
             ("Mostrar Shapefile", "shapefile"),
             ("Mostrar Talhoes", "talhoes"),
             ("Criar Talhao", "criar_talhao"),
@@ -194,7 +193,6 @@ class NotesAppGUI:
 
         self.panels["home"] = self._build_home_panel()
         self.panels["notes"] = self._build_notes_panel()
-        self.panels["upload_drone"] = self._build_upload_drone_panel()
         self.panels["shapefile"] = self._build_shapefile_panel()
         self.panels["talhoes"] = self._build_talhoes_panel()
         self.panels["criar_talhao"] = self._build_criar_talhao_panel()
@@ -236,121 +234,6 @@ class NotesAppGUI:
             font=("Helvetica", 12),
         ).place(relx=0.5, rely=0.53, anchor="center")
         return panel
-
-    def _build_shapefile_panel(self) -> tk.Frame:
-        import matplotlib
-        matplotlib.use("Agg")
-        from matplotlib.figure import Figure
-        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-
-        panel = tk.Frame(self.content_area, bg=_APP_BG)
-
-        # Toolbar
-        toolbar = tk.Frame(panel, bg=_APP_BG)
-        toolbar.pack(fill="x", padx=16, pady=(16, 8))
-
-        tk.Label(toolbar, text="Mostrar Shapefile", bg=_APP_BG, fg="#f5f5f5",
-                 font=("Helvetica", 18, "bold")).pack(side="left")
-
-        tk.Button(toolbar, text="Carregar Shapefile (.shp / .zip)",
-                  bg=_SIDEBAR_BTN_BG, fg=_SIDEBAR_FG,
-                  activebackground=_SIDEBAR_BTN_HOVER, relief="flat",
-                  font=("Helvetica", 11), padx=14, pady=7, cursor="hand2",
-                  command=self._shapefile_load).pack(side="right")
-
-        self._shp_status_var = tk.StringVar(value="Nenhum arquivo carregado.")
-        tk.Label(panel, textvariable=self._shp_status_var, bg=_APP_BG,
-                 fg="#888888", font=("Helvetica", 10)).pack(anchor="w", padx=16)
-
-        # Canvas matplotlib
-        self._shp_fig = Figure(figsize=(8, 5), dpi=100, facecolor="#111111")
-        self._shp_ax = self._shp_fig.add_subplot(111)
-        self._shp_ax.set_facecolor("#1c1c1c")
-        self._shp_ax.tick_params(colors="#888888")
-        for spine in self._shp_ax.spines.values():
-            spine.set_edgecolor("#333333")
-
-        self._shp_canvas = FigureCanvasTkAgg(self._shp_fig, master=panel)
-        self._shp_canvas.get_tk_widget().pack(fill="both", expand=True, padx=16, pady=(4, 8))
-
-        # Tabela de atributos
-        attr_frame = tk.Frame(panel, bg=_APP_BG)
-        attr_frame.pack(fill="x", padx=16, pady=(0, 12))
-        tk.Label(attr_frame, text="Atributos", bg=_APP_BG, fg=_ACCENT,
-                 font=("Helvetica", 10, "bold")).pack(anchor="w")
-        self._shp_attr_box = tk.Text(attr_frame, height=5, bg="#1c1c1c",
-                                      fg="#f5f5f5", font=("Courier", 9), relief="flat")
-        self._shp_attr_box.pack(fill="x")
-
-        return panel
-
-    def _shapefile_load(self) -> None:
-        import geopandas as gpd
-
-        path = filedialog.askopenfilename(
-            title="Selecione o Shapefile",
-            filetypes=[
-                ("Shapefile", "*.shp"),
-                ("ZIP com Shapefile", "*.zip"),
-                ("Todos os arquivos", "*.*"),
-            ],
-        )
-        if not path:
-            return
-
-        self._shp_status_var.set("Carregando...")
-        self.root.update()
-
-        try:
-            if path.endswith(".zip"):
-                gdf = gpd.read_file(f"zip://{path}")
-            else:
-                gdf = gpd.read_file(path)
-        except Exception as exc:
-            self._shp_status_var.set(f"Erro ao carregar: {exc}")
-            return
-
-        # Reprojetar para WGS84 se necessário
-        try:
-            if gdf.crs and gdf.crs.to_epsg() != 4326:
-                gdf = gdf.to_crs(epsg=4326)
-        except Exception:
-            pass
-
-        # Renderizar
-        self._shp_ax.clear()
-        self._shp_ax.set_facecolor("#1c1c1c")
-        try:
-            gdf.plot(ax=self._shp_ax, color="#7ec850", edgecolor="#3d6b3d",
-                     linewidth=0.8, alpha=0.7)
-        except Exception as exc:
-            self._shp_status_var.set(f"Erro ao renderizar: {exc}")
-            return
-
-        self._shp_ax.set_title(
-            path.split("\\")[-1].split("/")[-1],
-            color="#f5f5f5", fontsize=10,
-        )
-        self._shp_ax.tick_params(colors="#888888", labelsize=7)
-        for spine in self._shp_ax.spines.values():
-            spine.set_edgecolor("#333333")
-        self._shp_fig.tight_layout()
-        self._shp_canvas.draw()
-
-        # Atributos
-        self._shp_attr_box.config(state="normal")
-        self._shp_attr_box.delete("1.0", tk.END)
-        cols = [c for c in gdf.columns if c != "geometry"]
-        self._shp_attr_box.insert(tk.END, f"Geometrias: {len(gdf)}  |  CRS: {gdf.crs}\n")
-        self._shp_attr_box.insert(tk.END, f"Colunas: {', '.join(cols)}\n")
-        if len(gdf) > 0 and cols:
-            preview = gdf[cols].head(3).to_string(index=False)
-            self._shp_attr_box.insert(tk.END, preview)
-        self._shp_attr_box.config(state="disabled")
-
-        self._shp_status_var.set(
-            f"Carregado: {len(gdf)} geometria(s)  |  CRS: {gdf.crs}"
-        )
 
     def _build_criar_talhao_panel(self) -> tk.Frame:
         panel = tk.Frame(self.content_area, bg=_APP_BG)
@@ -481,11 +364,11 @@ class NotesAppGUI:
         body = ttk.Frame(inner)
         body.pack(fill="both", expand=True)
 
-        # Esquerda — lista
+        # Esquerda — lista de talhões
         left = ttk.Frame(body)
         left.pack(side="left", fill="y", padx=(0, 16))
 
-        self.talhoes_list = tk.Listbox(left, width=28, height=22, bg="#1c1c1c", fg="#f5f5f5",
+        self.talhoes_list = tk.Listbox(left, width=26, height=22, bg="#1c1c1c", fg="#f5f5f5",
                                         selectbackground=_SIDEBAR_BTN_HOVER, relief="flat")
         self.talhoes_list.pack(side="left", fill="y")
         self.talhoes_list.bind("<<ListboxSelect>>", self._select_talhao)
@@ -494,9 +377,13 @@ class NotesAppGUI:
         scroll.pack(side="right", fill="y")
         self.talhoes_list.configure(yscrollcommand=scroll.set)
 
-        # Direita — detalhes
-        right = ttk.Frame(body)
+        # Direita — detalhes + imagens
+        right = tk.Frame(body, bg=_APP_BG)
         right.pack(side="left", fill="both", expand=True)
+
+        # --- Detalhes ---
+        detail_frame = ttk.Frame(right)
+        detail_frame.pack(anchor="w", fill="x")
 
         self._talhao_detail_labels: Dict[str, tk.StringVar] = {}
         detail_fields = [
@@ -511,15 +398,58 @@ class NotesAppGUI:
             ("Criado em", "d_criado_em"),
         ]
         for i, (label, key) in enumerate(detail_fields):
-            ttk.Label(right, text=f"{label}:", font=("Helvetica", 10, "bold")).grid(
-                row=i, column=0, sticky="w", pady=5, padx=(0, 12)
+            ttk.Label(detail_frame, text=f"{label}:", font=("Helvetica", 10, "bold")).grid(
+                row=i, column=0, sticky="w", pady=3, padx=(0, 12)
             )
             var = tk.StringVar(value="—")
             self._talhao_detail_labels[key] = var
-            ttk.Label(right, textvariable=var, font=("Helvetica", 10)).grid(
-                row=i, column=1, sticky="w", pady=5
+            ttk.Label(detail_frame, textvariable=var, font=("Helvetica", 10)).grid(
+                row=i, column=1, sticky="w", pady=3
             )
 
+        ttk.Separator(right, orient="horizontal").pack(fill="x", pady=10)
+
+        # --- Imagens de Drone ---
+        tk.Label(right, text="Imagens de Drone vinculadas", bg=_APP_BG,
+                 fg=_ACCENT, font=("Helvetica", 10, "bold")).pack(anchor="w", pady=(0, 4))
+
+        self._talhao_images_list = tk.Listbox(
+            right, height=6, bg="#1c1c1c", fg="#f5f5f5",
+            selectbackground=_SIDEBAR_BTN_HOVER, relief="flat")
+        self._talhao_images_list.pack(fill="x", pady=(0, 8))
+        self._talhao_image_records: list = []
+
+        img_btn_frame = tk.Frame(right, bg=_APP_BG)
+        img_btn_frame.pack(anchor="w")
+
+        tk.Button(img_btn_frame, text="Upload Imagem",
+                  bg=_SIDEBAR_BTN_BG, fg=_SIDEBAR_FG,
+                  activebackground=_SIDEBAR_BTN_HOVER, relief="flat",
+                  font=("Helvetica", 10), padx=12, pady=6, cursor="hand2",
+                  command=self._talhao_upload_drone).pack(side="left", padx=(0, 8))
+
+        tk.Button(img_btn_frame, text="Mostrar Imagem",
+                  bg="#1a5c1a", fg=_SIDEBAR_FG,
+                  activebackground="#237a23", relief="flat",
+                  font=("Helvetica", 10), padx=12, pady=6, cursor="hand2",
+                  command=self._talhao_show_image).pack(side="left", padx=(0, 16))
+
+        tk.Label(img_btn_frame, text="Limiar VARI:",
+                 bg=_APP_BG, fg="#f5f5f5", font=("Helvetica", 10)).pack(side="left", padx=(0, 4))
+        self._vari_threshold_var = tk.StringVar(value="0.20")
+        ttk.Entry(img_btn_frame, textvariable=self._vari_threshold_var, width=6).pack(side="left", padx=(0, 8))
+
+        tk.Button(img_btn_frame, text="Processar VARI",
+                  bg="#4a2d1a", fg=_SIDEBAR_FG,
+                  activebackground="#6b3d23", relief="flat",
+                  font=("Helvetica", 10), padx=12, pady=6, cursor="hand2",
+                  command=self._talhao_process_vari).pack(side="left")
+
+        self._talhao_img_status = tk.StringVar(value="")
+        tk.Label(right, textvariable=self._talhao_img_status,
+                 bg=_APP_BG, fg=_ACCENT, font=("Helvetica", 9)).pack(anchor="w", pady=(6, 0))
+
+        self._current_talhao_id: Optional[str] = None
         return panel
 
     def _refresh_talhoes(self) -> None:
@@ -543,6 +473,7 @@ class NotesAppGUI:
         t = self.talhao_service.get_talhao(talhao_id)
         if not t:
             return
+        self._current_talhao_id = talhao_id
         self._talhao_detail_labels["d_nome"].set(t.nome)
         self._talhao_detail_labels["d_variedade"].set(t.variedade_cana)
         self._talhao_detail_labels["d_idade"].set(str(t.idade))
@@ -552,6 +483,270 @@ class NotesAppGUI:
         self._talhao_detail_labels["d_previsao"].set(t.previsao_colheita)
         self._talhao_detail_labels["d_irrigacao"].set("Sim" if t.irrigacao else "Nao")
         self._talhao_detail_labels["d_criado_em"].set(t.criado_em.strftime("%d/%m/%Y %H:%M"))
+        self._talhao_load_images(talhao_id)
+        self._talhao_img_status.set("")
+
+    # ---------------------------------------------------------- drone no talhão
+
+    def _talhao_load_images(self, talhao_id: str) -> None:
+        import json
+        from pathlib import Path
+        self._talhao_images_list.delete(0, tk.END)
+        self._talhao_image_records = []
+        registry_path = Path("data/drone_uploads.json")
+        if not registry_path.exists():
+            return
+        try:
+            records = json.loads(registry_path.read_text(encoding="utf-8"))
+        except Exception:
+            return
+        for rec in records:
+            if rec.get("talhao_id") == talhao_id:
+                self._talhao_image_records.append(rec)
+                ts = rec.get("uploaded_at", "")[:16].replace("T", " ")
+                self._talhao_images_list.insert(tk.END, f"{rec['filename']}   {ts}")
+
+    def _talhao_upload_drone(self) -> None:
+        import json
+        import shutil
+        from datetime import datetime
+        from pathlib import Path
+
+        if not self._current_talhao_id:
+            self._talhao_img_status.set("Selecione um talhao antes de fazer upload.")
+            return
+        path = filedialog.askopenfilename(
+            title="Selecione imagem de drone",
+            filetypes=[("GeoTIFF", "*.tif *.tiff"), ("Todos os arquivos", "*.*")],
+        )
+        if not path:
+            return
+
+        dest_dir = Path("data/drone_images")
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        src = Path(path)
+        dest = dest_dir / src.name
+        if dest.exists():
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            dest = dest_dir / f"{src.stem}_{ts}{src.suffix}"
+
+        self._talhao_img_status.set("Copiando arquivo...")
+        self.root.update()
+        shutil.copy2(str(src), str(dest))
+
+        registry_path = Path("data/drone_uploads.json")
+        registry: list = []
+        if registry_path.exists():
+            try:
+                registry = json.loads(registry_path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        registry.append({
+            "filename": dest.name,
+            "original_path": str(src),
+            "saved_path": str(dest),
+            "talhao_id": self._current_talhao_id,
+            "uploaded_by": self.current_user.login if self.current_user else "unknown",
+            "uploaded_at": datetime.now().isoformat(),
+        })
+        registry_path.write_text(
+            json.dumps(registry, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        self._talhao_load_images(self._current_talhao_id)
+        self._talhao_img_status.set(f"Salvo: {dest.name}")
+
+    def _talhao_show_image(self) -> None:
+        from matplotlib.figure import Figure
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+        sel = self._talhao_images_list.curselection()
+        if not sel:
+            self._talhao_img_status.set("Selecione uma imagem da lista.")
+            return
+        rec = self._talhao_image_records[sel[0]]
+        saved_path = rec.get("saved_path", "")
+
+        win = tk.Toplevel(self.root)
+        win.title(rec["filename"])
+        win.configure(bg=_APP_BG)
+        win.geometry("800x600")
+
+        fig = Figure(figsize=(7.5, 5.5), dpi=100, facecolor="#111111")
+        ax = fig.add_subplot(111)
+        ax.set_facecolor("#1c1c1c")
+
+        try:
+            import numpy as np
+            import rasterio
+            with rasterio.open(saved_path) as ds:
+                n_bands = ds.count
+                if n_bands >= 3:
+                    r = ds.read(1).astype(float)
+                    g = ds.read(2).astype(float)
+                    b = ds.read(3).astype(float)
+                    # Normaliza cada canal para 0-1
+                    def norm(arr):
+                        mn, mx = np.nanmin(arr), np.nanmax(arr)
+                        return (arr - mn) / (mx - mn + 1e-9)
+                    rgb = np.stack([norm(r), norm(g), norm(b)], axis=-1)
+                    ax.imshow(rgb, interpolation="nearest")
+                else:
+                    # Banda única — exibe em escala de cinza
+                    band = ds.read(1).astype(float)
+                    ax.imshow(band, cmap="gray", interpolation="nearest")
+            ax.set_title(rec["filename"], color="#f5f5f5", fontsize=10)
+        except Exception:
+            try:
+                from PIL import Image
+                import numpy as np
+                img = Image.open(saved_path).convert("RGB")
+                ax.imshow(np.array(img))
+                ax.set_title(rec["filename"], color="#f5f5f5", fontsize=10)
+            except Exception as exc:
+                ax.text(0.5, 0.5, f"Nao foi possivel exibir a imagem:\n{exc}",
+                        ha="center", va="center", color="#f5f5f5",
+                        transform=ax.transAxes, fontsize=10)
+
+        ax.tick_params(colors="#888888", labelsize=7)
+        for spine in ax.spines.values():
+            spine.set_edgecolor("#333333")
+        fig.tight_layout()
+
+        canvas = FigureCanvasTkAgg(fig, master=win)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True, padx=8, pady=8)
+
+    def _talhao_process_vari(self) -> None:
+        import json
+        import numpy as np
+        import rasterio
+        from datetime import datetime
+        from pathlib import Path
+        from matplotlib.figure import Figure
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+        sel = self._talhao_images_list.curselection()
+        if not sel:
+            self._talhao_img_status.set("Selecione uma imagem para processar.")
+            return
+
+        rec = self._talhao_image_records[sel[0]]
+        saved_path = rec.get("saved_path", "")
+
+        try:
+            threshold = float(self._vari_threshold_var.get())
+        except ValueError:
+            threshold = 0.20
+            self._vari_threshold_var.set("0.20")
+
+        self._talhao_img_status.set("Calculando VARI...")
+        self.root.update()
+
+        try:
+            with rasterio.open(saved_path) as ds:
+                if ds.count < 3:
+                    self._talhao_img_status.set("Imagem precisa ter pelo menos 3 bandas RGB.")
+                    return
+                r = ds.read(1).astype(np.float32)
+                g = ds.read(2).astype(np.float32)
+                b = ds.read(3).astype(np.float32)
+                transform = ds.transform
+                crs = ds.crs
+
+            # Normaliza bandas para 0-1
+            def norm(arr):
+                mn, mx = np.nanmin(arr), np.nanmax(arr)
+                return (arr - mn) / (mx - mn + 1e-9)
+
+            r_n, g_n, b_n = norm(r), norm(g), norm(b)
+
+            # Calcula VARI
+            vari = (g_n - r_n) / (g_n + r_n - b_n + 1e-9)
+            binary = (vari > threshold).astype(np.uint8) * 255
+            n_detected = int(np.sum(binary > 0))
+
+            # Salva binarizado
+            src_path = Path(saved_path)
+            bin_name = f"{src_path.stem}_vari_bin.tif"
+            bin_path = src_path.parent / bin_name
+
+            with rasterio.open(
+                str(bin_path), "w",
+                driver="GTiff",
+                height=binary.shape[0],
+                width=binary.shape[1],
+                count=1,
+                dtype=rasterio.uint8,
+                crs=crs,
+                transform=transform,
+            ) as dst:
+                dst.write(binary, 1)
+
+            # Registra no JSON
+            registry_path = Path("data/drone_uploads.json")
+            registry: list = []
+            if registry_path.exists():
+                try:
+                    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+                except Exception:
+                    pass
+
+            # Evita duplicatas
+            registry = [e for e in registry if e.get("saved_path") != str(bin_path)]
+            registry.append({
+                "filename": bin_name,
+                "original_path": saved_path,
+                "saved_path": str(bin_path),
+                "talhao_id": self._current_talhao_id,
+                "tipo": "vari_bin",
+                "limiar": threshold,
+                "origem": rec["filename"],
+                "uploaded_by": self.current_user.login if self.current_user else "unknown",
+                "uploaded_at": datetime.now().isoformat(),
+            })
+            registry_path.write_text(
+                json.dumps(registry, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+
+            if self._current_talhao_id:
+                self._talhao_load_images(self._current_talhao_id)
+
+        except Exception as exc:
+            self._talhao_img_status.set(f"Erro: {str(exc)[:80]}")
+            return
+
+        self._talhao_img_status.set(f"VARI concluido — {n_detected} px detectados. Salvo: {bin_name}")
+
+        # Popup com RGB + overlay
+        win = tk.Toplevel(self.root)
+        win.title(f"VARI — {rec['filename']} | Limiar={threshold:.2f} | {n_detected} px detectados")
+        win.configure(bg=_APP_BG)
+        win.geometry("1100x520")
+
+        fig = Figure(figsize=(11, 5), dpi=100, facecolor="#111111")
+
+        # Subplot esquerdo — RGB original
+        ax1 = fig.add_subplot(1, 2, 1)
+        ax1.set_facecolor("#1c1c1c")
+        rgb = np.stack([norm(r), norm(g), norm(b)], axis=-1)
+        ax1.imshow(rgb, interpolation="nearest")
+        ax1.set_title("RGB Original", color="#f5f5f5", fontsize=10)
+        ax1.axis("off")
+
+        # Subplot direito — overlay VARI
+        ax2 = fig.add_subplot(1, 2, 2)
+        ax2.set_facecolor("#1c1c1c")
+        overlay = (rgb * 0.5).copy()  # escurece o RGB
+        mask = binary > 0
+        overlay[mask] = [0.49, 0.78, 0.31]  # #7ec850 em float
+        ax2.imshow(overlay, interpolation="nearest")
+        ax2.set_title(f"VARI > {threshold:.2f}  (verde = alta vegetação)", color="#f5f5f5", fontsize=10)
+        ax2.axis("off")
+
+        fig.tight_layout(pad=1.5)
+        canvas = FigureCanvasTkAgg(fig, master=win)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True, padx=8, pady=8)
 
     # ---------------------------------------------------------- processar
 

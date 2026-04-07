@@ -1,0 +1,29 @@
+[
+  {
+    "filename": "45e7d4c8-c09f-4c0e-b51f-964a839a1775_9_1854_Japungu 218_2026-03-09.tif",
+    "original_path": "C:\\Users\\vitor\\Downloads\\45e7d4c8-c09f-4c0e-b51f-964a839a1775_9_1854_Japungu 218_2026-03-09.tif",
+    "saved_path": "data\\drone_images\\45e7d4c8-c09f-4c0e-b51f-964a839a1775_9_1854_Japungu 218_2026-03-09.tif",
+    "talhao_id": "287a08a0-798c-46db-b419-3358b500f7bd",
+    "uploaded_by": "vitor",
+    "uploaded_at": "2026-04-07T00:17:37.654174"
+  },
+  {
+    "filename": "redacao.tif",
+    "original_path": "C:\\Users\\vitor\\Downloads\\redacao.tif",
+    "saved_path": "data\\drone_images\\redacao.tif",
+    "talhao_id": "76794ebc-3bb7-461d-a83d-1663d13b1fff",
+    "uploaded_by": "vitor",
+    "uploaded_at": "2026-04-07T00:22:10.913539"
+  },
+  {
+    "filename": "45e7d4c8-c09f-4c0e-b51f-964a839a1775_9_1854_Japungu 218_2026-03-09_vari_bin.tif",
+    "original_path": "data\\drone_images\\45e7d4c8-c09f-4c0e-b51f-964a839a1775_9_1854_Japungu 218_2026-03-09.tif",
+    "saved_path": "data\\drone_images\\45e7d4c8-c09f-4c0e-b51f-964a839a1775_9_1854_Japungu 218_2026-03-09_vari_bin.tif",
+    "talhao_id": "287a08a0-798c-46db-b419-3358b500f7bd",
+    "tipo": "vari_bin",
+    "limiar": 0.2,
+    "origem": "45e7d4c8-c09f-4c0e-b51f-964a839a1775_9_1854_Japungu 218_2026-03-09.tif",
+    "uploaded_by": "vitor",
+    "uploaded_at": "2026-04-07T00:31:29.475896"
+  }
+]
