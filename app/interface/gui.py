@@ -781,10 +781,21 @@ class NotesAppGUI:
             self._dados_stats[key] = var
             ttk.Label(row, textvariable=var, font=("Helvetica", 10, "bold")).pack(side="left")
 
+        # Visualização NDVI colorida
+        tk.Label(right, text="Visualizacao NDVI", bg=_APP_BG,
+                 fg=_ACCENT, font=("Helvetica", 11, "bold")).pack(anchor="w", pady=(0, 4))
+        self._dados_ndvi_canvas = tk.Label(
+            right, bg="#1c1c1c", height=6,
+            text="Selecione uma imagem processada para visualizar",
+            fg="#555555", font=("Helvetica", 9),
+        )
+        self._dados_ndvi_canvas.pack(fill="x", pady=(0, 12))
+        self._ndvi_photo = None  # mantém referência para evitar GC
+
         tk.Label(right, text="Anomalias detectadas", bg=_APP_BG,
                  fg=_ACCENT, font=("Helvetica", 11, "bold")).pack(anchor="w", pady=(0, 4))
         self._dados_anomalies_list = tk.Listbox(
-            right, height=10, bg="#1c1c1c", fg="#f5f5f5",
+            right, height=8, bg="#1c1c1c", fg="#f5f5f5",
             selectbackground=_SIDEBAR_BTN_HOVER, relief="flat")
         self._dados_anomalies_list.pack(fill="both", expand=True)
 
@@ -816,12 +827,35 @@ class NotesAppGUI:
             self._dados_stats["max"].set(f"{result.max_value:.4f}")
             self._dados_stats["mean"].set(f"{result.mean_value:.4f}")
             self._dados_stats["crs"].set(result.crs or "—")
+            self._render_ndvi_image(result)
         else:
             for var in self._dados_stats.values():
                 var.set("—")
+            self._dados_ndvi_canvas.config(
+                image="", text="NDVI nao disponivel para esta imagem.", fg="#555555"
+            )
         self._dados_anomalies_list.delete(0, tk.END)
         for anomaly in self.satellite_service.list_anomalies(image_id):
             self._dados_anomalies_list.insert(tk.END, anomaly.label())
+
+    def _render_ndvi_image(self, result) -> None:
+        """Renderiza o array NDVI como faixa colorida no painel Mostrar Dados."""
+        try:
+            from PIL import ImageTk
+            from app.utils.ndvi_calculator import NDVICalculator
+            pil_img = NDVICalculator.to_image(result, width=520, height=80)
+            self._ndvi_photo = ImageTk.PhotoImage(pil_img)
+            self._dados_ndvi_canvas.config(
+                image=self._ndvi_photo, text="", height=80,
+            )
+        except ImportError:
+            self._dados_ndvi_canvas.config(
+                text="Instale Pillow para visualizar o NDVI.", fg="#ff6666",
+            )
+        except Exception:
+            self._dados_ndvi_canvas.config(
+                text="Nao foi possivel renderizar o NDVI.", fg="#ff6666",
+            )
 
     def _build_upload_drone_panel(self) -> tk.Frame:
         panel = tk.Frame(self.content_area, bg=_APP_BG)
@@ -1412,328 +1446,6 @@ class NotesAppGUI:
             if span > limit:
                 return zoom
         return 14
-
-    # ================================================================== satélite
-
-    def _build_satellite_panel(self) -> tk.Frame:
-        panel = tk.Frame(self.content_area, bg=_APP_BG)
-
-        # ── Título ──────────────────────────────────────────────────────
-        tk.Label(
-            panel, text="Análise de Satélite Sentinel-2",
-            bg=_APP_BG, fg="#f5f5f5", font=("Helvetica", 16, "bold"),
-        ).pack(anchor="w", padx=16, pady=(16, 8))
-
-        # ── Credenciais ─────────────────────────────────────────────────
-        cred_frame = tk.LabelFrame(
-            panel, text="Credenciais Copernicus", bg=_APP_BG, fg="#aaaaaa",
-            font=("Helvetica", 9),
-        )
-        cred_frame.pack(fill="x", padx=16, pady=(0, 8))
-
-        self._sat_user_var = tk.StringVar()
-        self._sat_pass_var = tk.StringVar()
-
-        tk.Label(cred_frame, text="Usuário", bg=_APP_BG, fg="#f5f5f5",
-                 font=("Helvetica", 10)).grid(row=0, column=0, sticky="w", padx=8, pady=4)
-        tk.Entry(cred_frame, textvariable=self._sat_user_var, width=24,
-                 bg="#1c1c1c", fg="#f5f5f5", insertbackground="#f5f5f5").grid(
-            row=0, column=1, padx=8, pady=4)
-
-        tk.Label(cred_frame, text="Senha", bg=_APP_BG, fg="#f5f5f5",
-                 font=("Helvetica", 10)).grid(row=0, column=2, sticky="w", padx=8)
-        tk.Entry(cred_frame, textvariable=self._sat_pass_var, show="*", width=24,
-                 bg="#1c1c1c", fg="#f5f5f5", insertbackground="#f5f5f5").grid(
-            row=0, column=3, padx=8, pady=4)
-
-        tk.Button(
-            cred_frame, text="Autenticar",
-            bg=_SIDEBAR_BTN_BG, fg=_SIDEBAR_FG,
-            activebackground=_SIDEBAR_BTN_HOVER, activeforeground=_SIDEBAR_FG,
-            relief="flat", font=("Helvetica", 10), padx=10, pady=4,
-            cursor="hand2", command=self._sat_authenticate,
-        ).grid(row=0, column=4, padx=12, pady=4)
-
-        self._sat_auth_label = tk.Label(
-            cred_frame, text="Não autenticado", bg=_APP_BG,
-            fg="#ff6666", font=("Helvetica", 9, "italic"),
-        )
-        self._sat_auth_label.grid(row=0, column=5, padx=8)
-
-        # ── Parâmetros de busca ─────────────────────────────────────────
-        params_frame = tk.Frame(panel, bg=_APP_BG)
-        params_frame.pack(fill="x", padx=16, pady=(0, 8))
-
-        bbox_frame = tk.LabelFrame(
-            params_frame, text="Bounding Box (WGS84)", bg=_APP_BG, fg="#aaaaaa",
-            font=("Helvetica", 9),
-        )
-        bbox_frame.pack(side="left", padx=(0, 12))
-
-        self._sat_lat_min = tk.StringVar(value="-8.0")
-        self._sat_lat_max = tk.StringVar(value="-7.0")
-        self._sat_lon_min = tk.StringVar(value="-35.5")
-        self._sat_lon_max = tk.StringVar(value="-34.5")
-
-        for i, (lbl, var) in enumerate([
-            ("Lat mín", self._sat_lat_min), ("Lat máx", self._sat_lat_max),
-            ("Lon mín", self._sat_lon_min), ("Lon máx", self._sat_lon_max),
-        ]):
-            tk.Label(bbox_frame, text=lbl, bg=_APP_BG, fg="#f5f5f5",
-                     font=("Helvetica", 9)).grid(row=i, column=0, sticky="w", padx=6, pady=2)
-            tk.Entry(bbox_frame, textvariable=var, width=10,
-                     bg="#1c1c1c", fg="#f5f5f5", insertbackground="#f5f5f5").grid(
-                row=i, column=1, padx=6, pady=2)
-
-        period_frame = tk.LabelFrame(
-            params_frame, text="Período e Filtros", bg=_APP_BG, fg="#aaaaaa",
-            font=("Helvetica", 9),
-        )
-        period_frame.pack(side="left")
-
-        self._sat_start_var = tk.StringVar(value="2024-01-01")
-        self._sat_end_var = tk.StringVar(value="2024-12-31")
-        self._sat_cloud_var = tk.StringVar(value="30")
-        self._sat_threshold_var = tk.StringVar(value="0.3")
-        self._sat_index_var = tk.StringVar(value="ndvi")
-
-        for i, (lbl, var) in enumerate([
-            ("Início (AAAA-MM-DD)", self._sat_start_var),
-            ("Fim (AAAA-MM-DD)", self._sat_end_var),
-            ("Nuvens máx (%)", self._sat_cloud_var),
-            ("Limiar NDVI", self._sat_threshold_var),
-        ]):
-            tk.Label(period_frame, text=lbl, bg=_APP_BG, fg="#f5f5f5",
-                     font=("Helvetica", 9)).grid(row=i, column=0, sticky="w", padx=6, pady=2)
-            tk.Entry(period_frame, textvariable=var, width=16,
-                     bg="#1c1c1c", fg="#f5f5f5", insertbackground="#f5f5f5").grid(
-                row=i, column=1, padx=6, pady=2)
-
-        tk.Label(period_frame, text="Índice", bg=_APP_BG, fg="#f5f5f5",
-                 font=("Helvetica", 9)).grid(row=4, column=0, sticky="w", padx=6, pady=2)
-        ttk.Combobox(
-            period_frame, textvariable=self._sat_index_var,
-            values=["ndvi", "evi"], state="readonly", width=8,
-        ).grid(row=4, column=1, padx=6, pady=2)
-
-        # ── Botões de ação ──────────────────────────────────────────────
-        actions_frame = tk.Frame(panel, bg=_APP_BG)
-        actions_frame.pack(fill="x", padx=16, pady=(0, 8))
-
-        for text, cmd in [
-            ("Buscar Imagens", self._sat_search),
-            ("Processar NDVI/EVI", self._sat_process),
-            ("Detectar Anomalias", self._sat_detect),
-        ]:
-            tk.Button(
-                actions_frame, text=text,
-                bg=_SIDEBAR_BTN_BG, fg=_SIDEBAR_FG,
-                activebackground=_SIDEBAR_BTN_HOVER, activeforeground=_SIDEBAR_FG,
-                relief="flat", font=("Helvetica", 10), padx=14, pady=6,
-                cursor="hand2", command=cmd,
-            ).pack(side="left", padx=(0, 8))
-
-        # ── Área central: lista de imagens + visualização ───────────────
-        center_frame = tk.Frame(panel, bg=_APP_BG)
-        center_frame.pack(fill="both", expand=True, padx=16, pady=(0, 4))
-
-        # Lista de imagens encontradas
-        left_col = tk.Frame(center_frame, bg=_APP_BG)
-        left_col.pack(side="left", fill="y", padx=(0, 12))
-
-        tk.Label(left_col, text="Imagens disponíveis:", bg=_APP_BG, fg="#aaaaaa",
-                 font=("Helvetica", 9)).pack(anchor="w")
-
-        images_scroll = ttk.Scrollbar(left_col, orient="vertical")
-        self._sat_images_list = tk.Listbox(
-            left_col, width=52, height=8,
-            bg="#1c1c1c", fg="#f5f5f5", selectbackground=_SIDEBAR_BTN_BG,
-            yscrollcommand=images_scroll.set,
-        )
-        images_scroll.config(command=self._sat_images_list.yview)
-        self._sat_images_list.pack(side="left", fill="y")
-        images_scroll.pack(side="left", fill="y")
-
-        # Anomalias
-        right_col = tk.Frame(center_frame, bg=_APP_BG)
-        right_col.pack(side="left", fill="both", expand=True)
-
-        tk.Label(right_col, text="Anomalias detectadas:", bg=_APP_BG, fg="#aaaaaa",
-                 font=("Helvetica", 9)).pack(anchor="w")
-
-        anom_scroll = ttk.Scrollbar(right_col, orient="vertical")
-        self._sat_anomalies_list = tk.Listbox(
-            right_col, bg="#1c1c1c", fg="#f5f5f5",
-            selectbackground=_SIDEBAR_BTN_BG,
-            yscrollcommand=anom_scroll.set,
-        )
-        anom_scroll.config(command=self._sat_anomalies_list.yview)
-        self._sat_anomalies_list.pack(side="left", fill="both", expand=True)
-        anom_scroll.pack(side="left", fill="y")
-
-        # ── Visualização NDVI ───────────────────────────────────────────
-        ndvi_frame = tk.Frame(panel, bg=_APP_BG)
-        ndvi_frame.pack(fill="x", padx=16, pady=(4, 0))
-
-        tk.Label(ndvi_frame, text="Visualização NDVI:", bg=_APP_BG, fg="#aaaaaa",
-                 font=("Helvetica", 9)).pack(anchor="w")
-
-        self._ndvi_canvas = tk.Label(
-            ndvi_frame, bg="#1c1c1c", width=80, height=8,
-            text="Processe uma imagem para visualizar o NDVI",
-            fg="#555555", font=("Helvetica", 10),
-        )
-        self._ndvi_canvas.pack(fill="x")
-        self._ndvi_photo = None  # mantém referência para evitar GC
-
-        # ── Status ──────────────────────────────────────────────────────
-        self._sat_status_var = tk.StringVar(value="")
-        tk.Label(
-            panel, textvariable=self._sat_status_var,
-            bg=_APP_BG, fg=_ACCENT, font=("Helvetica", 10),
-        ).pack(anchor="w", padx=16, pady=(4, 8))
-
-        self._sat_found_images: list = []
-        self._sat_current_result = None
-        return panel
-
-    # ------------------------------------------------------------------ handlers satélite
-
-    def _sat_authenticate(self) -> None:
-        if not self.satellite_service:
-            messagebox.showerror("Satélite", "SatelliteService não inicializado.")
-            return
-        user = self._sat_user_var.get().strip()
-        password = self._sat_pass_var.get().strip()
-        if not user or not password:
-            messagebox.showwarning("Autenticação", "Informe usuário e senha.")
-            return
-        self._sat_status_var.set("Autenticando...")
-        self.root.update()
-        try:
-            self.satellite_service.configure_credentials(user, password)
-            self._sat_auth_label.config(text="Autenticado", fg=_ACCENT)
-            self._sat_status_var.set("Autenticação realizada com sucesso.")
-        except Exception as exc:
-            self._sat_auth_label.config(text="Falha", fg="#ff6666")
-            messagebox.showerror("Autenticação", str(exc))
-            self._sat_status_var.set("")
-
-    def _sat_search(self) -> None:
-        if not self.satellite_service:
-            messagebox.showerror("Satélite", "SatelliteService não inicializado.")
-            return
-        try:
-            from app.models.satellite import BoundingBox
-            bbox = BoundingBox(
-                min_lat=float(self._sat_lat_min.get()),
-                min_lon=float(self._sat_lon_min.get()),
-                max_lat=float(self._sat_lat_max.get()),
-                max_lon=float(self._sat_lon_max.get()),
-            )
-            from datetime import datetime
-            start = datetime.strptime(self._sat_start_var.get().strip(), "%Y-%m-%d")
-            end = datetime.strptime(self._sat_end_var.get().strip(), "%Y-%m-%d")
-            cloud = float(self._sat_cloud_var.get())
-        except ValueError as exc:
-            messagebox.showerror("Parâmetros", f"Valor inválido: {exc}")
-            return
-
-        self._sat_status_var.set("Buscando imagens...")
-        self.root.update()
-        try:
-            images = self.satellite_service.search_images(bbox, start, end, cloud)
-        except RuntimeError as exc:
-            messagebox.showerror("Busca", str(exc))
-            self._sat_status_var.set("")
-            return
-
-        self._sat_found_images = images
-        self._sat_images_list.delete(0, tk.END)
-        for img in images:
-            self._sat_images_list.insert(tk.END, img.label())
-
-        self._sat_status_var.set(
-            f"{len(images)} imagem(s) encontrada(s)." if images
-            else "Nenhuma imagem encontrada para os parâmetros informados."
-        )
-
-    def _sat_process(self) -> None:
-        if not self.satellite_service:
-            messagebox.showerror("Satélite", "SatelliteService não inicializado.")
-            return
-        selection = self._sat_images_list.curselection()
-        if not selection:
-            messagebox.showwarning("Processar", "Selecione uma imagem na lista.")
-            return
-
-        image = self._sat_found_images[selection[0]]
-        index = self._sat_index_var.get()
-        self._sat_status_var.set(
-            f"Baixando bandas e calculando {index.upper()}... (pode demorar)"
-        )
-        self.root.update()
-        try:
-            result = self.satellite_service.process_image(image.image_id, index)
-        except RuntimeError as exc:
-            messagebox.showerror("Processamento", str(exc))
-            self._sat_status_var.set("")
-            return
-
-        self._sat_current_result = result
-        self._render_ndvi_image(result)
-        self._sat_status_var.set(
-            f"{index.upper()} calculado — média={result.mean_value:.3f}  "
-            f"min={result.min_value:.3f}  max={result.max_value:.3f}"
-        )
-
-    def _sat_detect(self) -> None:
-        if not self.satellite_service:
-            messagebox.showerror("Satélite", "SatelliteService não inicializado.")
-            return
-        if not self._sat_current_result:
-            messagebox.showwarning("Anomalias", "Processe uma imagem primeiro.")
-            return
-        try:
-            threshold = float(self._sat_threshold_var.get())
-        except ValueError:
-            messagebox.showerror("Parâmetros", "Limiar NDVI inválido.")
-            return
-
-        self._sat_status_var.set("Detectando anomalias...")
-        self.root.update()
-        try:
-            anomalies = self.satellite_service.detect_anomalies(
-                self._sat_current_result, threshold
-            )
-        except Exception as exc:
-            messagebox.showerror("Anomalias", str(exc))
-            self._sat_status_var.set("")
-            return
-
-        self._sat_anomalies_list.delete(0, tk.END)
-        for anomaly in anomalies:
-            self._sat_anomalies_list.insert(tk.END, anomaly.label())
-
-        self._sat_status_var.set(
-            f"{len(anomalies)} anomalia(s) detectada(s) com NDVI < {threshold}."
-        )
-
-    def _render_ndvi_image(self, result) -> None:
-        """Renderiza o array NDVI como imagem colorida no painel."""
-        try:
-            from PIL import ImageTk
-            from app.utils.ndvi_calculator import NDVICalculator
-            pil_img = NDVICalculator.to_image(result, width=860, height=120)
-            self._ndvi_photo = ImageTk.PhotoImage(pil_img)
-            self._ndvi_canvas.config(
-                image=self._ndvi_photo, text="", width=860, height=120
-            )
-        except ImportError:
-            self._ndvi_canvas.config(
-                text="Instale Pillow para visualizar o NDVI",
-                fg="#ff6666",
-            )
 
     # ================================================================== fim
 

@@ -18,5 +18,15 @@
     "is_admin": false,
     "ativo": true,
     "criado_em": "2026-04-07T00:22:43.470829"
+  },
+  {
+    "login": "guilherme",
+    "nome": "guilherme",
+    "email": "guilherme@gmail.com",
+    "senha_hash": "cf6ee8073e148b6a$15f5587e345e102a482449dac32dce7d0fd782cf3632d0b85e8afa735662cdaf",
+    "idade": 18,
+    "is_admin": false,
+    "ativo": true,
+    "criado_em": "2026-04-07T02:51:13.473181"
   }
 ]
