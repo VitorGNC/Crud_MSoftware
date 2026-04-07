@@ -154,6 +154,7 @@ class NotesAppGUI:
 
         nav_items = [
             ("Anotacoes", "notes"),
+            ("Upload Imagem Drone", "upload_drone"),
             ("Mostrar Shapefile", "shapefile"),
             ("Mostrar Talhoes", "talhoes"),
             ("Criar Talhao", "criar_talhao"),
@@ -186,6 +187,7 @@ class NotesAppGUI:
 
         self.panels["home"] = self._build_home_panel()
         self.panels["notes"] = self._build_notes_panel()
+        self.panels["upload_drone"] = self._build_upload_drone_panel()
         self.panels["shapefile"] = self._build_placeholder_panel("Mostrar Shapefile")
         self.panels["talhoes"] = self._build_placeholder_panel("Mostrar Talhoes")
         self.panels["criar_talhao"] = self._build_placeholder_panel("Criar Talhao")
@@ -227,6 +229,156 @@ class NotesAppGUI:
             font=("Helvetica", 12),
         ).place(relx=0.5, rely=0.53, anchor="center")
         return panel
+
+    def _build_upload_drone_panel(self) -> tk.Frame:
+        panel = tk.Frame(self.content_area, bg=_APP_BG)
+
+        tk.Label(
+            panel,
+            text="Upload de Imagem de Drone",
+            bg=_APP_BG,
+            fg="#f5f5f5",
+            font=("Helvetica", 20, "bold"),
+        ).pack(pady=(60, 4))
+
+        tk.Label(
+            panel,
+            text="Formatos suportados: GeoTIFF (.tif, .tiff) | Tamanho maximo: 25 GB",
+            bg=_APP_BG,
+            fg="#888888",
+            font=("Helvetica", 10),
+        ).pack(pady=(0, 32))
+
+        # Área de drop / seleção
+        drop_frame = tk.Frame(panel, bg="#1c1c1c", bd=2, relief="groove", width=500, height=160)
+        drop_frame.pack(pady=(0, 24))
+        drop_frame.pack_propagate(False)
+
+        tk.Label(
+            drop_frame,
+            text="Clique em 'Selecionar Arquivo' para escolher\numa imagem georreferenciada de drone",
+            bg="#1c1c1c",
+            fg="#555555",
+            font=("Helvetica", 12),
+            justify="center",
+        ).place(relx=0.5, rely=0.4, anchor="center")
+
+        self.drone_filename_var = tk.StringVar(value="Nenhum arquivo selecionado")
+        tk.Label(
+            drop_frame,
+            textvariable=self.drone_filename_var,
+            bg="#1c1c1c",
+            fg=_ACCENT,
+            font=("Helvetica", 10, "italic"),
+        ).place(relx=0.5, rely=0.72, anchor="center")
+
+        # Botões
+        btn_frame = tk.Frame(panel, bg=_APP_BG)
+        btn_frame.pack()
+
+        tk.Button(
+            btn_frame,
+            text="Selecionar Arquivo",
+            bg=_SIDEBAR_BTN_BG,
+            fg=_SIDEBAR_FG,
+            activebackground=_SIDEBAR_BTN_HOVER,
+            activeforeground=_SIDEBAR_FG,
+            relief="flat",
+            font=("Helvetica", 11),
+            padx=20,
+            pady=10,
+            cursor="hand2",
+            command=self._select_drone_file,
+        ).pack(side="left", padx=8)
+
+        tk.Button(
+            btn_frame,
+            text="Enviar",
+            bg="#1a5c1a",
+            fg=_SIDEBAR_FG,
+            activebackground="#237a23",
+            activeforeground=_SIDEBAR_FG,
+            relief="flat",
+            font=("Helvetica", 11),
+            padx=20,
+            pady=10,
+            cursor="hand2",
+            command=self._upload_drone_file,
+        ).pack(side="left", padx=8)
+
+        self.drone_status_var = tk.StringVar(value="")
+        tk.Label(
+            panel,
+            textvariable=self.drone_status_var,
+            bg=_APP_BG,
+            fg=_ACCENT,
+            font=("Helvetica", 11),
+        ).pack(pady=(20, 0))
+
+        self._drone_selected_path: Optional[str] = None
+        return panel
+
+    def _select_drone_file(self) -> None:
+        path = filedialog.askopenfilename(
+            title="Selecione imagem de drone",
+            filetypes=[("GeoTIFF", "*.tif *.tiff"), ("Todos os arquivos", "*.*")],
+        )
+        if not path:
+            return
+        self._drone_selected_path = path
+        filename = path.split("/")[-1].split("\\")[-1]
+        self.drone_filename_var.set(filename)
+        self.drone_status_var.set("")
+
+    def _upload_drone_file(self) -> None:
+        import json
+        import shutil
+        from datetime import datetime
+        from pathlib import Path
+
+        if not self._drone_selected_path:
+            messagebox.showwarning("Upload", "Selecione um arquivo antes de enviar.")
+            return
+
+        dest_dir = Path("data/drone_images")
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
+        src = Path(self._drone_selected_path)
+        dest = dest_dir / src.name
+
+        # Se já existe, adiciona timestamp para não sobrescrever
+        if dest.exists():
+            stem = src.stem
+            suffix = src.suffix
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            dest = dest_dir / f"{stem}_{timestamp}{suffix}"
+
+        self.drone_status_var.set("Copiando arquivo...")
+        self.root.update()
+
+        shutil.copy2(str(src), str(dest))
+
+        # Registra no JSON de persistência
+        registry_path = Path("data/drone_uploads.json")
+        registry: list = []
+        if registry_path.exists():
+            try:
+                registry = json.loads(registry_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                registry = []
+
+        registry.append({
+            "filename": dest.name,
+            "original_path": str(src),
+            "saved_path": str(dest),
+            "uploaded_by": self.current_user.login if self.current_user else "unknown",
+            "uploaded_at": datetime.now().isoformat(),
+        })
+        registry_path.write_text(
+            json.dumps(registry, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+
+        self.drone_status_var.set(f"Salvo em data/drone_images/{dest.name}")
 
     def _build_notes_panel(self) -> tk.Frame:
         panel = tk.Frame(self.content_area, bg=_APP_BG)
