@@ -83,7 +83,7 @@ def bootstrap() -> None:
         "api": RestApiInterfaceStrategy(host="127.0.0.1", port=8000),
     }
     strategy = interface_options.get(ACTIVE_INTERFACE, GuiInterfaceStrategy())
-    strategy.run(sender, receiver, note_service, user_service, talhao_service, satelite_service)
+    strategy.run(sender, receiver, note_service, user_service, talhao_service, satellite_service)
 
 
 def main() -> None:
