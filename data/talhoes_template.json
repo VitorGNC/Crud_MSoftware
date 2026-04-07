@@ -1,0 +1,102 @@
+[
+  {
+    "nome": "Talhao A1",
+    "variedade_cana": "RB92579",
+    "idade": 2,
+    "ultima_colheita": "2024-06-15",
+    "solo": "Argissolo Vermelho-Amarelo",
+    "status": "Ativo",
+    "previsao_colheita": "2025-06-01",
+    "irrigacao": true
+  },
+  {
+    "nome": "Talhao A2",
+    "variedade_cana": "RB92579",
+    "idade": 1,
+    "ultima_colheita": "2025-01-10",
+    "solo": "Argissolo Vermelho-Amarelo",
+    "status": "Ativo",
+    "previsao_colheita": "2026-01-01",
+    "irrigacao": true
+  },
+  {
+    "nome": "Talhao B1",
+    "variedade_cana": "SP81-3250",
+    "idade": 5,
+    "ultima_colheita": "2023-07-20",
+    "solo": "Latossolo Vermelho",
+    "status": "Replantio",
+    "previsao_colheita": "2026-07-01",
+    "irrigacao": false
+  },
+  {
+    "nome": "Talhao B2",
+    "variedade_cana": "SP81-3250",
+    "idade": 4,
+    "ultima_colheita": "2023-09-05",
+    "solo": "Latossolo Vermelho",
+    "status": "Pousio",
+    "previsao_colheita": "2026-09-01",
+    "irrigacao": false
+  },
+  {
+    "nome": "Talhao C1",
+    "variedade_cana": "RB867515",
+    "idade": 3,
+    "ultima_colheita": "2024-08-10",
+    "solo": "Neossolo Quartzarenico",
+    "status": "Em colheita",
+    "previsao_colheita": "2025-08-01",
+    "irrigacao": true
+  },
+  {
+    "nome": "Talhao C2",
+    "variedade_cana": "RB867515",
+    "idade": 2,
+    "ultima_colheita": "2024-11-20",
+    "solo": "Neossolo Quartzarenico",
+    "status": "Ativo",
+    "previsao_colheita": "2025-11-01",
+    "irrigacao": true
+  },
+  {
+    "nome": "Talhao D1",
+    "variedade_cana": "CTC4",
+    "idade": 6,
+    "ultima_colheita": "2022-05-30",
+    "solo": "Cambissolo Haptico",
+    "status": "Replantio",
+    "previsao_colheita": "2027-05-01",
+    "irrigacao": false
+  },
+  {
+    "nome": "Talhao D2",
+    "variedade_cana": "CTC4",
+    "idade": 3,
+    "ultima_colheita": "2024-03-15",
+    "solo": "Cambissolo Haptico",
+    "status": "Ativo",
+    "previsao_colheita": "2025-03-01",
+    "irrigacao": false
+  },
+  {
+    "nome": "Talhao E1",
+    "variedade_cana": "RB966928",
+    "idade": 1,
+    "ultima_colheita": "2025-02-28",
+    "solo": "Gleissolo Melânico",
+    "status": "Ativo",
+    "previsao_colheita": "2026-02-01",
+    "irrigacao": true
+  },
+  {
+    "nome": "Talhao E2",
+    "variedade_cana": "RB966928",
+    "idade": 4,
+    "ultima_colheita": "2023-12-01",
+    "solo": "Gleissolo Melânico",
+    "status": "Em colheita",
+    "previsao_colheita": "2025-12-01",
+    "irrigacao": true
+  }
+]

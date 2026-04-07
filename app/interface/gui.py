@@ -26,15 +26,18 @@ class NotesAppGUI:
         receiver: NoteReceiver,
         note_service: NoteService,
         user_service: UserService,
+        talhao_service=None,
     ) -> None:
         self.sender = sender
         self.receiver = receiver
         self.factory = CommandFactory(receiver)
         self.note_service = note_service
         self.user_service = user_service
+        self.talhao_service = talhao_service
         self.current_user = None
         self.current_note_id: Optional[str] = None
         self.index_to_note: Dict[int, str] = {}
+        self.index_to_talhao: Dict[int, str] = {}
         self.panels: Dict[str, tk.Frame] = {}
 
         self.root = tk.Tk()
@@ -189,8 +192,8 @@ class NotesAppGUI:
         self.panels["notes"] = self._build_notes_panel()
         self.panels["upload_drone"] = self._build_upload_drone_panel()
         self.panels["shapefile"] = self._build_placeholder_panel("Mostrar Shapefile")
-        self.panels["talhoes"] = self._build_placeholder_panel("Mostrar Talhoes")
-        self.panels["criar_talhao"] = self._build_placeholder_panel("Criar Talhao")
+        self.panels["talhoes"] = self._build_talhoes_panel()
+        self.panels["criar_talhao"] = self._build_criar_talhao_panel()
         self.panels["processar"] = self._build_placeholder_panel("Processar")
         self.panels["dados"] = self._build_placeholder_panel("Mostrar Dados")
 
@@ -229,6 +232,207 @@ class NotesAppGUI:
             font=("Helvetica", 12),
         ).place(relx=0.5, rely=0.53, anchor="center")
         return panel
+
+    def _build_criar_talhao_panel(self) -> tk.Frame:
+        panel = tk.Frame(self.content_area, bg=_APP_BG)
+        inner = ttk.Frame(panel, padding=32)
+        inner.place(relx=0.5, rely=0.5, anchor="center")
+
+        tk.Label(
+            inner, text="Criar Talhao", bg=_APP_BG, fg="#f5f5f5",
+            font=("Helvetica", 18, "bold"),
+        ).grid(row=0, column=0, columnspan=2, pady=(0, 20), sticky="w")
+
+        campos = [
+            ("Nome:", "t_nome"),
+            ("Variedade de Cana:", "t_variedade"),
+            ("Idade (anos):", "t_idade"),
+            ("Ultima Colheita (AAAA-MM-DD):", "t_ultima_colheita"),
+            ("Solo:", "t_solo"),
+            ("Previsao Colheita (AAAA-MM-DD):", "t_previsao"),
+        ]
+        self._talhao_vars: Dict[str, tk.StringVar] = {}
+        for row, (label, key) in enumerate(campos, start=1):
+            ttk.Label(inner, text=label).grid(row=row, column=0, sticky="w", pady=4, padx=(0, 12))
+            var = tk.StringVar()
+            self._talhao_vars[key] = var
+            ttk.Entry(inner, textvariable=var, width=36).grid(row=row, column=1, pady=4, sticky="ew")
+
+        # Status combobox
+        ttk.Label(inner, text="Status:").grid(row=7, column=0, sticky="w", pady=4, padx=(0, 12))
+        self._talhao_status_var = tk.StringVar(value="Ativo")
+        status_cb = ttk.Combobox(
+            inner, textvariable=self._talhao_status_var, width=33,
+            values=["Ativo", "Em colheita", "Pousio", "Replantio"], state="readonly",
+        )
+        status_cb.grid(row=7, column=1, pady=4, sticky="ew")
+
+        # Irrigação checkbox
+        self._talhao_irrigacao_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            inner, text="Irrigacao", variable=self._talhao_irrigacao_var,
+        ).grid(row=8, column=0, columnspan=2, sticky="w", pady=8)
+
+        # Botões
+        btn_frame = ttk.Frame(inner)
+        btn_frame.grid(row=9, column=0, columnspan=2, pady=(12, 0), sticky="w")
+
+        tk.Button(
+            btn_frame, text="Salvar Talhao",
+            bg="#1a5c1a", fg=_SIDEBAR_FG,
+            activebackground="#237a23", activeforeground=_SIDEBAR_FG,
+            relief="flat", font=("Helvetica", 11), padx=16, pady=8, cursor="hand2",
+            command=self._salvar_talhao,
+        ).pack(side="left", padx=(0, 12))
+
+        tk.Button(
+            btn_frame, text="Importar JSON",
+            bg=_SIDEBAR_BTN_BG, fg=_SIDEBAR_FG,
+            activebackground=_SIDEBAR_BTN_HOVER, activeforeground=_SIDEBAR_FG,
+            relief="flat", font=("Helvetica", 11), padx=16, pady=8, cursor="hand2",
+            command=self._importar_talhoes_json,
+        ).pack(side="left")
+
+        self._talhao_status_msg = tk.StringVar(value="")
+        tk.Label(
+            inner, textvariable=self._talhao_status_msg,
+            bg=_APP_BG, fg=_ACCENT, font=("Helvetica", 10),
+        ).grid(row=10, column=0, columnspan=2, pady=(12, 0), sticky="w")
+
+        return panel
+
+    def _salvar_talhao(self) -> None:
+        if not self.talhao_service:
+            return
+        try:
+            idade = int(self._talhao_vars["t_idade"].get() or 0)
+        except ValueError:
+            self._talhao_status_msg.set("Idade deve ser um numero inteiro.")
+            return
+        try:
+            self.talhao_service.criar_talhao(
+                nome=self._talhao_vars["t_nome"].get(),
+                variedade_cana=self._talhao_vars["t_variedade"].get(),
+                idade=idade,
+                ultima_colheita=self._talhao_vars["t_ultima_colheita"].get(),
+                solo=self._talhao_vars["t_solo"].get(),
+                status=self._talhao_status_var.get(),
+                previsao_colheita=self._talhao_vars["t_previsao"].get(),
+                irrigacao=self._talhao_irrigacao_var.get(),
+            )
+        except ValueError as exc:
+            self._talhao_status_msg.set(str(exc))
+            return
+        # Limpa formulário
+        for var in self._talhao_vars.values():
+            var.set("")
+        self._talhao_status_var.set("Ativo")
+        self._talhao_irrigacao_var.set(False)
+        self._talhao_status_msg.set("Talhao salvo com sucesso.")
+
+    def _importar_talhoes_json(self) -> None:
+        if not self.talhao_service:
+            return
+        path = filedialog.askopenfilename(
+            title="Selecione arquivo JSON de talhoes",
+            filetypes=[("JSON", "*.json"), ("Todos os arquivos", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            criados, erros = self.talhao_service.importar_json(path)
+        except Exception as exc:
+            self._talhao_status_msg.set(f"Erro ao ler arquivo: {exc}")
+            return
+        msg = f"{criados} talhao(es) importado(s)."
+        if erros:
+            msg += f" {len(erros)} erro(s): {erros[0]}"
+        self._talhao_status_msg.set(msg)
+
+    def _build_talhoes_panel(self) -> tk.Frame:
+        panel = tk.Frame(self.content_area, bg=_APP_BG)
+        inner = ttk.Frame(panel, padding=16)
+        inner.pack(fill="both", expand=True)
+
+        tk.Label(
+            inner, text="Talhoes", bg=_APP_BG, fg="#f5f5f5",
+            font=("Helvetica", 18, "bold"),
+        ).pack(anchor="w", pady=(0, 12))
+
+        body = ttk.Frame(inner)
+        body.pack(fill="both", expand=True)
+
+        # Esquerda — lista
+        left = ttk.Frame(body)
+        left.pack(side="left", fill="y", padx=(0, 16))
+
+        self.talhoes_list = tk.Listbox(left, width=28, height=22, bg="#1c1c1c", fg="#f5f5f5",
+                                        selectbackground=_SIDEBAR_BTN_HOVER, relief="flat")
+        self.talhoes_list.pack(side="left", fill="y")
+        self.talhoes_list.bind("<<ListboxSelect>>", self._select_talhao)
+
+        scroll = ttk.Scrollbar(left, orient="vertical", command=self.talhoes_list.yview)
+        scroll.pack(side="right", fill="y")
+        self.talhoes_list.configure(yscrollcommand=scroll.set)
+
+        # Direita — detalhes
+        right = ttk.Frame(body)
+        right.pack(side="left", fill="both", expand=True)
+
+        self._talhao_detail_labels: Dict[str, tk.StringVar] = {}
+        detail_fields = [
+            ("Nome", "d_nome"),
+            ("Variedade de Cana", "d_variedade"),
+            ("Idade (anos)", "d_idade"),
+            ("Ultima Colheita", "d_ultima_colheita"),
+            ("Solo", "d_solo"),
+            ("Status", "d_status"),
+            ("Previsao Colheita", "d_previsao"),
+            ("Irrigacao", "d_irrigacao"),
+            ("Criado em", "d_criado_em"),
+        ]
+        for i, (label, key) in enumerate(detail_fields):
+            ttk.Label(right, text=f"{label}:", font=("Helvetica", 10, "bold")).grid(
+                row=i, column=0, sticky="w", pady=5, padx=(0, 12)
+            )
+            var = tk.StringVar(value="—")
+            self._talhao_detail_labels[key] = var
+            ttk.Label(right, textvariable=var, font=("Helvetica", 10)).grid(
+                row=i, column=1, sticky="w", pady=5
+            )
+
+        return panel
+
+    def _refresh_talhoes(self) -> None:
+        if not self.talhao_service:
+            return
+        self.talhoes_list.delete(0, tk.END)
+        self.index_to_talhao.clear()
+        for idx, t in enumerate(self.talhao_service.listar_talhoes()):
+            self.talhoes_list.insert(idx, t.nome)
+            self.index_to_talhao[idx] = t.talhao_id
+        for var in self._talhao_detail_labels.values():
+            var.set("—")
+
+    def _select_talhao(self, _event) -> None:
+        selection = self.talhoes_list.curselection()
+        if not selection:
+            return
+        talhao_id = self.index_to_talhao.get(selection[0])
+        if not talhao_id or not self.talhao_service:
+            return
+        t = self.talhao_service.get_talhao(talhao_id)
+        if not t:
+            return
+        self._talhao_detail_labels["d_nome"].set(t.nome)
+        self._talhao_detail_labels["d_variedade"].set(t.variedade_cana)
+        self._talhao_detail_labels["d_idade"].set(str(t.idade))
+        self._talhao_detail_labels["d_ultima_colheita"].set(t.ultima_colheita)
+        self._talhao_detail_labels["d_solo"].set(t.solo)
+        self._talhao_detail_labels["d_status"].set(t.status)
+        self._talhao_detail_labels["d_previsao"].set(t.previsao_colheita)
+        self._talhao_detail_labels["d_irrigacao"].set("Sim" if t.irrigacao else "Nao")
+        self._talhao_detail_labels["d_criado_em"].set(t.criado_em.strftime("%d/%m/%Y %H:%M"))
 
     def _build_upload_drone_panel(self) -> tk.Frame:
         panel = tk.Frame(self.content_area, bg=_APP_BG)
@@ -442,6 +646,8 @@ class NotesAppGUI:
         self.panels[name].place(relwidth=1, relheight=1)
         if name == "notes":
             self._refresh_notes()
+        elif name == "talhoes":
+            self._refresh_talhoes()
 
     def _show_login(self) -> None:
         self.main_frame.pack_forget()
