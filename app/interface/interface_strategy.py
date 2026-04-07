@@ -10,13 +10,13 @@ from app.interface.gui import NotesAppGUI
 
 class InterfaceStrategy(ABC):
     @abstractmethod
-    def run(self, sender, receiver, note_service, user_service) -> None:
+    def run(self, sender, receiver, note_service, user_service, satellite_service=None) -> None:
         ...
 
 
 class GuiInterfaceStrategy(InterfaceStrategy):
-    def run(self, sender, receiver, note_service, user_service) -> None:
-        app = NotesAppGUI(sender, receiver, note_service, user_service)
+    def run(self, sender, receiver, note_service, user_service, satellite_service=None) -> None:
+        app = NotesAppGUI(sender, receiver, note_service, user_service, satellite_service)
         app.run()
 
 
@@ -26,6 +26,6 @@ class RestApiInterfaceStrategy(InterfaceStrategy):
         self.port = port
         self.reload = reload
 
-    def run(self, sender, receiver, note_service, user_service) -> None:
+    def run(self, sender, receiver, note_service, user_service, satellite_service=None) -> None:
         api_app = create_api_app(sender, receiver, note_service, user_service)
         uvicorn.run(api_app, host=self.host, port=self.port, reload=self.reload)

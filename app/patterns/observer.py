@@ -14,6 +14,12 @@ class EventoNota(Enum):
     REMOVIDA = auto()
 
 
+class EventoSatelite(Enum):
+    BUSCA_REALIZADA = auto()
+    NDVI_CALCULADO = auto()
+    ANOMALIA_DETECTADA = auto()
+
+
 class NoteObserver(ABC):
     @abstractmethod
     def notificar(self, evento: EventoNota, dados: dict[str, Any]) -> None: ...
@@ -65,3 +71,40 @@ class NoteEventBus:
             if isinstance(obs, StatisticsObserver):
                 return obs.get_stats()
         return {}
+
+
+# ------------------------------------------------------------------ satélite
+
+
+class SatelliteObserver(ABC):
+    @abstractmethod
+    def notificar(self, evento: EventoSatelite, dados: dict[str, Any]) -> None: ...
+
+
+class LogSatelliteObserver(SatelliteObserver):
+    """Registra eventos de satélite no log do sistema."""
+
+    def __init__(self, logger: LoggerAdapter) -> None:
+        self._logger = logger
+
+    def notificar(self, evento: EventoSatelite, dados: dict[str, Any]) -> None:
+        self._logger.info(f"[SATELITE] {evento.name} | {dados}")
+
+
+class SatelliteEventBus:
+    _observadores: list[SatelliteObserver] = []
+
+    @classmethod
+    def registrar(cls, observador: SatelliteObserver) -> None:
+        cls._observadores.append(observador)
+
+    @classmethod
+    def desregistrar(cls, observador: SatelliteObserver) -> None:
+        cls._observadores = [o for o in cls._observadores if o is not observador]
+
+    @classmethod
+    def emitir(
+        cls, evento: EventoSatelite, dados: dict[str, Any] | None = None
+    ) -> None:
+        for obs in cls._observadores:
+            obs.notificar(evento, dados or {})

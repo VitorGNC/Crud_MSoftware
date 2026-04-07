@@ -6,9 +6,11 @@ from typing import Dict, Optional
 
 from app.models.usuario import UsuarioErro
 from app.patterns.factory import CommandFactory
+from app.patterns.observer import EventoSatelite, LogSatelliteObserver, SatelliteEventBus
 from app.patterns.receiver import NoteReceiver
 from app.patterns.sender import CommandSender
 from app.services.note_service import NoteService
+from app.services.satellite_service import SatelliteService
 from app.services.user_service import UserService
 
 _SIDEBAR_BG = "#1a2e1a"
@@ -26,12 +28,14 @@ class NotesAppGUI:
         receiver: NoteReceiver,
         note_service: NoteService,
         user_service: UserService,
+        satellite_service: Optional[SatelliteService] = None,
     ) -> None:
         self.sender = sender
         self.receiver = receiver
         self.factory = CommandFactory(receiver)
         self.note_service = note_service
         self.user_service = user_service
+        self.satellite_service = satellite_service
         self.current_user = None
         self.current_note_id: Optional[str] = None
         self.index_to_note: Dict[int, str] = {}
@@ -188,10 +192,10 @@ class NotesAppGUI:
         self.panels["home"] = self._build_home_panel()
         self.panels["notes"] = self._build_notes_panel()
         self.panels["upload_drone"] = self._build_upload_drone_panel()
-        self.panels["shapefile"] = self._build_placeholder_panel("Mostrar Shapefile")
+        self.panels["shapefile"] = self._build_shapefile_panel()
         self.panels["talhoes"] = self._build_placeholder_panel("Mostrar Talhoes")
         self.panels["criar_talhao"] = self._build_placeholder_panel("Criar Talhao")
-        self.panels["processar"] = self._build_placeholder_panel("Processar")
+        self.panels["processar"] = self._build_satellite_panel()
         self.panels["dados"] = self._build_placeholder_panel("Mostrar Dados")
 
     def _build_home_panel(self) -> tk.Frame:
@@ -585,6 +589,560 @@ class NotesAppGUI:
             messagebox.showinfo("Desfazer", "Nao ha operacoes para desfazer.")
             return
         self._refresh_notes()
+
+    # ================================================================== shapefile
+
+    def _build_shapefile_panel(self) -> tk.Frame:
+        panel = tk.Frame(self.content_area, bg=_APP_BG)
+
+        # ── Título ───────────────────────────────────────────────────────
+        tk.Label(
+            panel, text="Visualização de Shapefile",
+            bg=_APP_BG, fg="#f5f5f5", font=("Helvetica", 16, "bold"),
+        ).pack(anchor="w", padx=16, pady=(16, 8))
+
+        # ── Barra de controles ───────────────────────────────────────────
+        ctrl = tk.Frame(panel, bg=_APP_BG)
+        ctrl.pack(fill="x", padx=16, pady=(0, 6))
+
+        for text, cmd in [
+            ("Selecionar Arquivo", self._select_shapefile),
+            ("Carregar Camada", self._render_shapefile),
+            ("Limpar Mapa", self._clear_shapefile),
+        ]:
+            tk.Button(
+                ctrl, text=text,
+                bg=_SIDEBAR_BTN_BG, fg=_SIDEBAR_FG,
+                activebackground=_SIDEBAR_BTN_HOVER, activeforeground=_SIDEBAR_FG,
+                relief="flat", font=("Helvetica", 10), padx=12, pady=6,
+                cursor="hand2", command=cmd,
+            ).pack(side="left", padx=(0, 6))
+
+        self._shp_tile_mode = tk.StringVar(value="satellite")
+        tk.Button(
+            ctrl, text="Satélite / Rua",
+            bg="#1a3a5c", fg=_SIDEBAR_FG,
+            activebackground="#245080", activeforeground=_SIDEBAR_FG,
+            relief="flat", font=("Helvetica", 10), padx=12, pady=6,
+            cursor="hand2", command=self._toggle_tile_server,
+        ).pack(side="left", padx=(0, 16))
+
+        self._shp_filename_var = tk.StringVar(value="Nenhum arquivo selecionado")
+        tk.Label(
+            ctrl, textvariable=self._shp_filename_var,
+            bg=_APP_BG, fg=_ACCENT, font=("Helvetica", 10, "italic"),
+        ).pack(side="left")
+
+        # ── Mapa interativo ──────────────────────────────────────────────
+        try:
+            import tkintermapview
+            self._map_widget = tkintermapview.TkinterMapView(panel, corner_radius=0)
+            self._map_widget.pack(fill="both", expand=True, padx=16, pady=(0, 4))
+            # Tile de satélite Google como base — alinhado com RF01
+            self._map_widget.set_tile_server(
+                "https://mt0.google.com/vt/lyrs=s&hl=pt-BR&x={x}&y={y}&z={z}&s=Ga",
+                max_zoom=22,
+            )
+            # Centro padrão: Paraíba, Brasil
+            self._map_widget.set_position(-7.12, -36.72)
+            self._map_widget.set_zoom(7)
+            self._map_available = True
+        except ImportError:
+            tk.Label(
+                panel,
+                text="Instale 'tkintermapview' e 'geopandas' para usar este painel.",
+                bg=_APP_BG, fg="#ff6666", font=("Helvetica", 12),
+            ).pack(expand=True)
+            self._map_available = False
+
+        # ── Status ───────────────────────────────────────────────────────
+        self._shp_status_var = tk.StringVar(value="")
+        tk.Label(
+            panel, textvariable=self._shp_status_var,
+            bg=_APP_BG, fg=_ACCENT, font=("Helvetica", 10),
+        ).pack(anchor="w", padx=16, pady=(0, 8))
+
+        self._shp_selected_path: Optional[str] = None
+        self._shp_drawn_shapes: list = []
+        return panel
+
+    def _select_shapefile(self) -> None:
+        path = filedialog.askopenfilename(
+            title="Selecione o Shapefile",
+            filetypes=[
+                ("Shapefile", "*.shp"),
+                ("ZIP com Shapefile", "*.zip"),
+                ("Todos os arquivos", "*.*"),
+            ],
+        )
+        if not path:
+            return
+        self._shp_selected_path = path
+        self._shp_filename_var.set(path.replace("\\", "/").split("/")[-1])
+        self._shp_status_var.set("")
+
+    def _render_shapefile(self) -> None:
+        if not getattr(self, "_map_available", False):
+            messagebox.showerror("Shapefile", "Mapa não disponível. Verifique as dependências.")
+            return
+        if not self._shp_selected_path:
+            messagebox.showwarning("Shapefile", "Selecione um arquivo antes de carregar.")
+            return
+
+        try:
+            import geopandas as gpd
+        except ImportError:
+            messagebox.showerror("Shapefile", "Instale 'geopandas' para renderizar shapefiles.")
+            return
+
+        self._shp_status_var.set("Lendo arquivo...")
+        self.root.update()
+
+        try:
+            path = self._shp_selected_path
+            gdf = (
+                gpd.read_file(f"zip://{path}")
+                if path.lower().endswith(".zip")
+                else gpd.read_file(path)
+            )
+        except Exception as exc:
+            messagebox.showerror("Shapefile", f"Erro ao ler arquivo:\n{exc}")
+            self._shp_status_var.set("")
+            return
+
+        crs_info = "sem CRS"
+        if gdf.crs is None:
+            self._shp_status_var.set("Aviso: arquivo sem CRS definido — assumindo WGS84.")
+        elif gdf.crs.to_epsg() != 4326:
+            crs_info = gdf.crs.to_string()
+            self._shp_status_var.set(f"Reprojetando {crs_info} → WGS84...")
+            self.root.update()
+            gdf = gdf.to_crs(epsg=4326)
+        else:
+            crs_info = "EPSG:4326"
+
+        self._clear_shapefile()
+        self._shp_status_var.set("Renderizando camadas...")
+        self.root.update()
+
+        count = 0
+        for geom in gdf.geometry:
+            if geom is None:
+                continue
+            self._shp_drawn_shapes.extend(self._draw_geometry(geom))
+            count += 1
+
+        # Centralizar e dar zoom no extent da camada
+        bounds = gdf.total_bounds  # [minx, miny, maxx, maxy]
+        center_lat = (bounds[1] + bounds[3]) / 2
+        center_lon = (bounds[0] + bounds[2]) / 2
+        self._map_widget.set_position(center_lat, center_lon)
+        self._map_widget.set_zoom(self._span_to_zoom(
+            max(bounds[3] - bounds[1], bounds[2] - bounds[0])
+        ))
+
+        feat = "feição" if count == 1 else "feições"
+        self._shp_status_var.set(
+            f"{count} {feat} renderizada(s)  |  CRS original: {crs_info}"
+        )
+
+    def _draw_geometry(self, geom) -> list:
+        """Converte uma geometria shapely em objetos do mapa e retorna a lista."""
+        shapes = []
+        t = geom.geom_type
+
+        if t == "Polygon":
+            coords = [(y, x) for x, y in geom.exterior.coords]
+            shapes.append(self._map_widget.set_polygon(
+                coords, fill_color=None, outline_color="#7ec850", border_width=2,
+            ))
+
+        elif t == "MultiPolygon":
+            for poly in geom.geoms:
+                shapes.extend(self._draw_geometry(poly))
+
+        elif t == "LineString":
+            coords = [(y, x) for x, y in geom.coords]
+            shapes.append(self._map_widget.set_path(coords, color="#4da6ff", width=2))
+
+        elif t == "MultiLineString":
+            for line in geom.geoms:
+                shapes.extend(self._draw_geometry(line))
+
+        elif t == "Point":
+            shapes.append(self._map_widget.set_marker(geom.y, geom.x, text=""))
+
+        elif t == "MultiPoint":
+            for pt in geom.geoms:
+                shapes.extend(self._draw_geometry(pt))
+
+        elif t == "GeometryCollection":
+            for g in geom.geoms:
+                shapes.extend(self._draw_geometry(g))
+
+        return shapes
+
+    def _clear_shapefile(self) -> None:
+        for shape in self._shp_drawn_shapes:
+            try:
+                shape.delete()
+            except Exception:
+                pass
+        self._shp_drawn_shapes.clear()
+        self._shp_status_var.set("")
+
+    def _toggle_tile_server(self) -> None:
+        if not getattr(self, "_map_available", False):
+            return
+        import tkintermapview
+        if self._shp_tile_mode.get() == "satellite":
+            self._map_widget.set_tile_server(
+                "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            )
+            self._shp_tile_mode.set("street")
+        else:
+            self._map_widget.set_tile_server(
+                "https://mt0.google.com/vt/lyrs=s&hl=pt-BR&x={x}&y={y}&z={z}&s=Ga",
+                max_zoom=22,
+            )
+            self._shp_tile_mode.set("satellite")
+
+    @staticmethod
+    def _span_to_zoom(span: float) -> int:
+        """Converte extensão geográfica (graus) em nível de zoom aproximado."""
+        thresholds = [
+            (40, 4), (20, 5), (10, 6), (5, 7),
+            (2, 8), (1, 9), (0.5, 10), (0.1, 12),
+            (0.05, 13),
+        ]
+        for limit, zoom in thresholds:
+            if span > limit:
+                return zoom
+        return 14
+
+    # ================================================================== satélite
+
+    def _build_satellite_panel(self) -> tk.Frame:
+        panel = tk.Frame(self.content_area, bg=_APP_BG)
+
+        # ── Título ──────────────────────────────────────────────────────
+        tk.Label(
+            panel, text="Análise de Satélite Sentinel-2",
+            bg=_APP_BG, fg="#f5f5f5", font=("Helvetica", 16, "bold"),
+        ).pack(anchor="w", padx=16, pady=(16, 8))
+
+        # ── Credenciais ─────────────────────────────────────────────────
+        cred_frame = tk.LabelFrame(
+            panel, text="Credenciais Copernicus", bg=_APP_BG, fg="#aaaaaa",
+            font=("Helvetica", 9),
+        )
+        cred_frame.pack(fill="x", padx=16, pady=(0, 8))
+
+        self._sat_user_var = tk.StringVar()
+        self._sat_pass_var = tk.StringVar()
+
+        tk.Label(cred_frame, text="Usuário", bg=_APP_BG, fg="#f5f5f5",
+                 font=("Helvetica", 10)).grid(row=0, column=0, sticky="w", padx=8, pady=4)
+        tk.Entry(cred_frame, textvariable=self._sat_user_var, width=24,
+                 bg="#1c1c1c", fg="#f5f5f5", insertbackground="#f5f5f5").grid(
+            row=0, column=1, padx=8, pady=4)
+
+        tk.Label(cred_frame, text="Senha", bg=_APP_BG, fg="#f5f5f5",
+                 font=("Helvetica", 10)).grid(row=0, column=2, sticky="w", padx=8)
+        tk.Entry(cred_frame, textvariable=self._sat_pass_var, show="*", width=24,
+                 bg="#1c1c1c", fg="#f5f5f5", insertbackground="#f5f5f5").grid(
+            row=0, column=3, padx=8, pady=4)
+
+        tk.Button(
+            cred_frame, text="Autenticar",
+            bg=_SIDEBAR_BTN_BG, fg=_SIDEBAR_FG,
+            activebackground=_SIDEBAR_BTN_HOVER, activeforeground=_SIDEBAR_FG,
+            relief="flat", font=("Helvetica", 10), padx=10, pady=4,
+            cursor="hand2", command=self._sat_authenticate,
+        ).grid(row=0, column=4, padx=12, pady=4)
+
+        self._sat_auth_label = tk.Label(
+            cred_frame, text="Não autenticado", bg=_APP_BG,
+            fg="#ff6666", font=("Helvetica", 9, "italic"),
+        )
+        self._sat_auth_label.grid(row=0, column=5, padx=8)
+
+        # ── Parâmetros de busca ─────────────────────────────────────────
+        params_frame = tk.Frame(panel, bg=_APP_BG)
+        params_frame.pack(fill="x", padx=16, pady=(0, 8))
+
+        bbox_frame = tk.LabelFrame(
+            params_frame, text="Bounding Box (WGS84)", bg=_APP_BG, fg="#aaaaaa",
+            font=("Helvetica", 9),
+        )
+        bbox_frame.pack(side="left", padx=(0, 12))
+
+        self._sat_lat_min = tk.StringVar(value="-8.0")
+        self._sat_lat_max = tk.StringVar(value="-7.0")
+        self._sat_lon_min = tk.StringVar(value="-35.5")
+        self._sat_lon_max = tk.StringVar(value="-34.5")
+
+        for i, (lbl, var) in enumerate([
+            ("Lat mín", self._sat_lat_min), ("Lat máx", self._sat_lat_max),
+            ("Lon mín", self._sat_lon_min), ("Lon máx", self._sat_lon_max),
+        ]):
+            tk.Label(bbox_frame, text=lbl, bg=_APP_BG, fg="#f5f5f5",
+                     font=("Helvetica", 9)).grid(row=i, column=0, sticky="w", padx=6, pady=2)
+            tk.Entry(bbox_frame, textvariable=var, width=10,
+                     bg="#1c1c1c", fg="#f5f5f5", insertbackground="#f5f5f5").grid(
+                row=i, column=1, padx=6, pady=2)
+
+        period_frame = tk.LabelFrame(
+            params_frame, text="Período e Filtros", bg=_APP_BG, fg="#aaaaaa",
+            font=("Helvetica", 9),
+        )
+        period_frame.pack(side="left")
+
+        self._sat_start_var = tk.StringVar(value="2024-01-01")
+        self._sat_end_var = tk.StringVar(value="2024-12-31")
+        self._sat_cloud_var = tk.StringVar(value="30")
+        self._sat_threshold_var = tk.StringVar(value="0.3")
+        self._sat_index_var = tk.StringVar(value="ndvi")
+
+        for i, (lbl, var) in enumerate([
+            ("Início (AAAA-MM-DD)", self._sat_start_var),
+            ("Fim (AAAA-MM-DD)", self._sat_end_var),
+            ("Nuvens máx (%)", self._sat_cloud_var),
+            ("Limiar NDVI", self._sat_threshold_var),
+        ]):
+            tk.Label(period_frame, text=lbl, bg=_APP_BG, fg="#f5f5f5",
+                     font=("Helvetica", 9)).grid(row=i, column=0, sticky="w", padx=6, pady=2)
+            tk.Entry(period_frame, textvariable=var, width=16,
+                     bg="#1c1c1c", fg="#f5f5f5", insertbackground="#f5f5f5").grid(
+                row=i, column=1, padx=6, pady=2)
+
+        tk.Label(period_frame, text="Índice", bg=_APP_BG, fg="#f5f5f5",
+                 font=("Helvetica", 9)).grid(row=4, column=0, sticky="w", padx=6, pady=2)
+        ttk.Combobox(
+            period_frame, textvariable=self._sat_index_var,
+            values=["ndvi", "evi"], state="readonly", width=8,
+        ).grid(row=4, column=1, padx=6, pady=2)
+
+        # ── Botões de ação ──────────────────────────────────────────────
+        actions_frame = tk.Frame(panel, bg=_APP_BG)
+        actions_frame.pack(fill="x", padx=16, pady=(0, 8))
+
+        for text, cmd in [
+            ("Buscar Imagens", self._sat_search),
+            ("Processar NDVI/EVI", self._sat_process),
+            ("Detectar Anomalias", self._sat_detect),
+        ]:
+            tk.Button(
+                actions_frame, text=text,
+                bg=_SIDEBAR_BTN_BG, fg=_SIDEBAR_FG,
+                activebackground=_SIDEBAR_BTN_HOVER, activeforeground=_SIDEBAR_FG,
+                relief="flat", font=("Helvetica", 10), padx=14, pady=6,
+                cursor="hand2", command=cmd,
+            ).pack(side="left", padx=(0, 8))
+
+        # ── Área central: lista de imagens + visualização ───────────────
+        center_frame = tk.Frame(panel, bg=_APP_BG)
+        center_frame.pack(fill="both", expand=True, padx=16, pady=(0, 4))
+
+        # Lista de imagens encontradas
+        left_col = tk.Frame(center_frame, bg=_APP_BG)
+        left_col.pack(side="left", fill="y", padx=(0, 12))
+
+        tk.Label(left_col, text="Imagens disponíveis:", bg=_APP_BG, fg="#aaaaaa",
+                 font=("Helvetica", 9)).pack(anchor="w")
+
+        images_scroll = ttk.Scrollbar(left_col, orient="vertical")
+        self._sat_images_list = tk.Listbox(
+            left_col, width=52, height=8,
+            bg="#1c1c1c", fg="#f5f5f5", selectbackground=_SIDEBAR_BTN_BG,
+            yscrollcommand=images_scroll.set,
+        )
+        images_scroll.config(command=self._sat_images_list.yview)
+        self._sat_images_list.pack(side="left", fill="y")
+        images_scroll.pack(side="left", fill="y")
+
+        # Anomalias
+        right_col = tk.Frame(center_frame, bg=_APP_BG)
+        right_col.pack(side="left", fill="both", expand=True)
+
+        tk.Label(right_col, text="Anomalias detectadas:", bg=_APP_BG, fg="#aaaaaa",
+                 font=("Helvetica", 9)).pack(anchor="w")
+
+        anom_scroll = ttk.Scrollbar(right_col, orient="vertical")
+        self._sat_anomalies_list = tk.Listbox(
+            right_col, bg="#1c1c1c", fg="#f5f5f5",
+            selectbackground=_SIDEBAR_BTN_BG,
+            yscrollcommand=anom_scroll.set,
+        )
+        anom_scroll.config(command=self._sat_anomalies_list.yview)
+        self._sat_anomalies_list.pack(side="left", fill="both", expand=True)
+        anom_scroll.pack(side="left", fill="y")
+
+        # ── Visualização NDVI ───────────────────────────────────────────
+        ndvi_frame = tk.Frame(panel, bg=_APP_BG)
+        ndvi_frame.pack(fill="x", padx=16, pady=(4, 0))
+
+        tk.Label(ndvi_frame, text="Visualização NDVI:", bg=_APP_BG, fg="#aaaaaa",
+                 font=("Helvetica", 9)).pack(anchor="w")
+
+        self._ndvi_canvas = tk.Label(
+            ndvi_frame, bg="#1c1c1c", width=80, height=8,
+            text="Processe uma imagem para visualizar o NDVI",
+            fg="#555555", font=("Helvetica", 10),
+        )
+        self._ndvi_canvas.pack(fill="x")
+        self._ndvi_photo = None  # mantém referência para evitar GC
+
+        # ── Status ──────────────────────────────────────────────────────
+        self._sat_status_var = tk.StringVar(value="")
+        tk.Label(
+            panel, textvariable=self._sat_status_var,
+            bg=_APP_BG, fg=_ACCENT, font=("Helvetica", 10),
+        ).pack(anchor="w", padx=16, pady=(4, 8))
+
+        self._sat_found_images: list = []
+        self._sat_current_result = None
+        return panel
+
+    # ------------------------------------------------------------------ handlers satélite
+
+    def _sat_authenticate(self) -> None:
+        if not self.satellite_service:
+            messagebox.showerror("Satélite", "SatelliteService não inicializado.")
+            return
+        user = self._sat_user_var.get().strip()
+        password = self._sat_pass_var.get().strip()
+        if not user or not password:
+            messagebox.showwarning("Autenticação", "Informe usuário e senha.")
+            return
+        self._sat_status_var.set("Autenticando...")
+        self.root.update()
+        try:
+            self.satellite_service.configure_credentials(user, password)
+            self._sat_auth_label.config(text="Autenticado", fg=_ACCENT)
+            self._sat_status_var.set("Autenticação realizada com sucesso.")
+        except Exception as exc:
+            self._sat_auth_label.config(text="Falha", fg="#ff6666")
+            messagebox.showerror("Autenticação", str(exc))
+            self._sat_status_var.set("")
+
+    def _sat_search(self) -> None:
+        if not self.satellite_service:
+            messagebox.showerror("Satélite", "SatelliteService não inicializado.")
+            return
+        try:
+            from app.models.satellite import BoundingBox
+            bbox = BoundingBox(
+                min_lat=float(self._sat_lat_min.get()),
+                min_lon=float(self._sat_lon_min.get()),
+                max_lat=float(self._sat_lat_max.get()),
+                max_lon=float(self._sat_lon_max.get()),
+            )
+            from datetime import datetime
+            start = datetime.strptime(self._sat_start_var.get().strip(), "%Y-%m-%d")
+            end = datetime.strptime(self._sat_end_var.get().strip(), "%Y-%m-%d")
+            cloud = float(self._sat_cloud_var.get())
+        except ValueError as exc:
+            messagebox.showerror("Parâmetros", f"Valor inválido: {exc}")
+            return
+
+        self._sat_status_var.set("Buscando imagens...")
+        self.root.update()
+        try:
+            images = self.satellite_service.search_images(bbox, start, end, cloud)
+        except RuntimeError as exc:
+            messagebox.showerror("Busca", str(exc))
+            self._sat_status_var.set("")
+            return
+
+        self._sat_found_images = images
+        self._sat_images_list.delete(0, tk.END)
+        for img in images:
+            self._sat_images_list.insert(tk.END, img.label())
+
+        self._sat_status_var.set(
+            f"{len(images)} imagem(s) encontrada(s)." if images
+            else "Nenhuma imagem encontrada para os parâmetros informados."
+        )
+
+    def _sat_process(self) -> None:
+        if not self.satellite_service:
+            messagebox.showerror("Satélite", "SatelliteService não inicializado.")
+            return
+        selection = self._sat_images_list.curselection()
+        if not selection:
+            messagebox.showwarning("Processar", "Selecione uma imagem na lista.")
+            return
+
+        image = self._sat_found_images[selection[0]]
+        index = self._sat_index_var.get()
+        self._sat_status_var.set(
+            f"Baixando bandas e calculando {index.upper()}... (pode demorar)"
+        )
+        self.root.update()
+        try:
+            result = self.satellite_service.process_image(image.image_id, index)
+        except RuntimeError as exc:
+            messagebox.showerror("Processamento", str(exc))
+            self._sat_status_var.set("")
+            return
+
+        self._sat_current_result = result
+        self._render_ndvi_image(result)
+        self._sat_status_var.set(
+            f"{index.upper()} calculado — média={result.mean_value:.3f}  "
+            f"min={result.min_value:.3f}  max={result.max_value:.3f}"
+        )
+
+    def _sat_detect(self) -> None:
+        if not self.satellite_service:
+            messagebox.showerror("Satélite", "SatelliteService não inicializado.")
+            return
+        if not self._sat_current_result:
+            messagebox.showwarning("Anomalias", "Processe uma imagem primeiro.")
+            return
+        try:
+            threshold = float(self._sat_threshold_var.get())
+        except ValueError:
+            messagebox.showerror("Parâmetros", "Limiar NDVI inválido.")
+            return
+
+        self._sat_status_var.set("Detectando anomalias...")
+        self.root.update()
+        try:
+            anomalies = self.satellite_service.detect_anomalies(
+                self._sat_current_result, threshold
+            )
+        except Exception as exc:
+            messagebox.showerror("Anomalias", str(exc))
+            self._sat_status_var.set("")
+            return
+
+        self._sat_anomalies_list.delete(0, tk.END)
+        for anomaly in anomalies:
+            self._sat_anomalies_list.insert(tk.END, anomaly.label())
+
+        self._sat_status_var.set(
+            f"{len(anomalies)} anomalia(s) detectada(s) com NDVI < {threshold}."
+        )
+
+    def _render_ndvi_image(self, result) -> None:
+        """Renderiza o array NDVI como imagem colorida no painel."""
+        try:
+            from PIL import ImageTk
+            from app.utils.ndvi_calculator import NDVICalculator
+            pil_img = NDVICalculator.to_image(result, width=860, height=120)
+            self._ndvi_photo = ImageTk.PhotoImage(pil_img)
+            self._ndvi_canvas.config(
+                image=self._ndvi_photo, text="", width=860, height=120
+            )
+        except ImportError:
+            self._ndvi_canvas.config(
+                text="Instale Pillow para visualizar o NDVI",
+                fg="#ff6666",
+            )
+
+    # ================================================================== fim
 
     def run(self) -> None:
         self.root.mainloop()

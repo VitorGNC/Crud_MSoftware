@@ -12,13 +12,21 @@ from app.patterns.command import CommandInvoker
 from app.patterns.memento import NoteCaretaker
 from app.patterns.receiver import NoteReceiver
 from app.patterns.sender import CommandSender
+from app.patterns.observer import (
+    LogNoteObserver,
+    LogSatelliteObserver,
+    NoteEventBus,
+    SatelliteEventBus,
+    StatisticsObserver,
+)
 from app.repository.note_repository import NoteRepository
+from app.repository.satellite_repository import SatelliteRepository
 from app.repository.strategies import InMemoryStorageStrategy, JsonStorageStrategy
 from app.repository.user_repository import UserRepository
 from app.services.note_service import NoteService
+from app.services.satellite_service import SatelliteService
 from app.services.user_service import UserService
 from app.utils.logger_adapter import ConsoleLogTarget, FileLogTarget, LoggerAdapter
-from app.patterns.observer import LogNoteObserver, NoteEventBus, StatisticsObserver
 
 ACTIVE_STORAGE = "json"  # altere para "mem" durante testes
 ACTIVE_LOGGER = "console"  # altere para "file" para persistir logs
@@ -54,9 +62,13 @@ def bootstrap() -> None:
 
     NoteEventBus.registrar(LogNoteObserver(logger_adapter))
     NoteEventBus.registrar(StatisticsObserver())
+    SatelliteEventBus.registrar(LogSatelliteObserver(logger_adapter))
 
     note_service = NoteService(note_repository, logger_adapter)
     user_service = UserService(user_repository, logger_adapter)
+
+    satellite_repository = SatelliteRepository(Path("data/satellite"))
+    satellite_service = SatelliteService(satellite_repository, logger_adapter)
 
     receiver = NoteReceiver(note_service)
     invoker = CommandInvoker(caretaker)
@@ -67,7 +79,7 @@ def bootstrap() -> None:
         "api": RestApiInterfaceStrategy(host="127.0.0.1", port=8000),
     }
     strategy = interface_options.get(ACTIVE_INTERFACE, GuiInterfaceStrategy())
-    strategy.run(sender, receiver, note_service, user_service)
+    strategy.run(sender, receiver, note_service, user_service, satellite_service)
 
 
 def main() -> None:
