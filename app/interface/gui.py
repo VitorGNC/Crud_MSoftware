@@ -11,6 +11,13 @@ from app.patterns.sender import CommandSender
 from app.services.note_service import NoteService
 from app.services.user_service import UserService
 
+_SIDEBAR_BG = "#1a2e1a"
+_SIDEBAR_BTN_BG = "#2d4a2d"
+_SIDEBAR_BTN_HOVER = "#3d6b3d"
+_SIDEBAR_FG = "#f0f0f0"
+_ACCENT = "#7ec850"
+_APP_BG = "#111111"
+
 
 class NotesAppGUI:
     def __init__(
@@ -28,30 +35,38 @@ class NotesAppGUI:
         self.current_user = None
         self.current_note_id: Optional[str] = None
         self.index_to_note: Dict[int, str] = {}
+        self.panels: Dict[str, tk.Frame] = {}
 
         self.root = tk.Tk()
-        self.root.title("Notes App - Design Patterns")
-        self.root.geometry("960x600")
-        self.root.configure(bg="#111111")
+        self.root.title("RigTech")
+        self.root.geometry("1100x650")
+        self.root.configure(bg=_APP_BG)
 
         self.login_frame = ttk.Frame(self.root, padding=24)
-        self.notes_frame = ttk.Frame(self.root, padding=16)
+        self.main_frame = tk.Frame(self.root, bg=_APP_BG)
 
         self._setup_styles()
         self._build_login_frame()
-        self._build_notes_frame()
+        self._build_main_frame()
         self._show_login()
 
     def _setup_styles(self) -> None:
         style = ttk.Style()
         style.theme_use("clam")
-        style.configure("TFrame", background="#111111")
-        style.configure("TLabel", background="#111111", foreground="#f5f5f5")
+        style.configure("TFrame", background=_APP_BG)
+        style.configure("TLabel", background=_APP_BG, foreground="#f5f5f5")
         style.configure("TButton", padding=8)
         style.configure("Header.TLabel", font=("Helvetica", 16, "bold"))
+        style.configure(
+            "Content.TLabel",
+            background=_APP_BG,
+            foreground="#f5f5f5",
+        )
+
+    # ------------------------------------------------------------------ login
 
     def _build_login_frame(self) -> None:
-        ttk.Label(self.login_frame, text="Notes App", style="Header.TLabel").grid(
+        ttk.Label(self.login_frame, text="RigTech", style="Header.TLabel").grid(
             row=0, column=0, columnspan=2, pady=(0, 16)
         )
 
@@ -105,10 +120,7 @@ class NotesAppGUI:
             row=9, column=1, pady=4
         )
 
-        ttk.Label(self.login_frame, text="Senha").grid(
-            row=10, column=0, sticky="w"
-        )
-        
+        ttk.Label(self.login_frame, text="Senha").grid(row=10, column=0, sticky="w")
         ttk.Entry(
             self.login_frame, textvariable=self.senha_registro_var, show="*", width=30
         ).grid(row=10, column=1, pady=4)
@@ -117,12 +129,115 @@ class NotesAppGUI:
             self.login_frame, text="Registrar", command=self._handle_register
         ).grid(row=11, column=0, columnspan=2, pady=(12, 0), sticky="ew")
 
-    def _build_notes_frame(self) -> None:
-        top_bar = ttk.Frame(self.notes_frame)
+    # ------------------------------------------------------------------ main
+
+    def _build_main_frame(self) -> None:
+        self._build_sidebar()
+        self._build_content_area()
+
+    def _build_sidebar(self) -> None:
+        sidebar = tk.Frame(self.main_frame, width=200, bg=_SIDEBAR_BG)
+        sidebar.pack(side="left", fill="y")
+        sidebar.pack_propagate(False)
+
+        # Logo
+        tk.Label(
+            sidebar,
+            text="RigTech",
+            bg=_SIDEBAR_BG,
+            fg=_ACCENT,
+            font=("Helvetica", 18, "bold"),
+            pady=20,
+        ).pack(fill="x")
+
+        tk.Frame(sidebar, bg="#3d6b3d", height=1).pack(fill="x", padx=12, pady=(0, 16))
+
+        nav_items = [
+            ("Anotacoes", "notes"),
+            ("Mostrar Shapefile", "shapefile"),
+            ("Mostrar Talhoes", "talhoes"),
+            ("Criar Talhao", "criar_talhao"),
+            ("Processar", "processar"),
+            ("Mostrar Dados", "dados"),
+        ]
+
+        for label, panel_name in nav_items:
+            btn = tk.Button(
+                sidebar,
+                text=label,
+                bg=_SIDEBAR_BTN_BG,
+                fg=_SIDEBAR_FG,
+                activebackground=_SIDEBAR_BTN_HOVER,
+                activeforeground=_SIDEBAR_FG,
+                relief="flat",
+                bd=0,
+                font=("Helvetica", 11),
+                anchor="w",
+                padx=16,
+                pady=10,
+                cursor="hand2",
+                command=lambda n=panel_name: self._show_panel(n),
+            )
+            btn.pack(fill="x", pady=1)
+
+    def _build_content_area(self) -> None:
+        self.content_area = tk.Frame(self.main_frame, bg=_APP_BG)
+        self.content_area.pack(side="left", fill="both", expand=True)
+
+        self.panels["home"] = self._build_home_panel()
+        self.panels["notes"] = self._build_notes_panel()
+        self.panels["shapefile"] = self._build_placeholder_panel("Mostrar Shapefile")
+        self.panels["talhoes"] = self._build_placeholder_panel("Mostrar Talhoes")
+        self.panels["criar_talhao"] = self._build_placeholder_panel("Criar Talhao")
+        self.panels["processar"] = self._build_placeholder_panel("Processar")
+        self.panels["dados"] = self._build_placeholder_panel("Mostrar Dados")
+
+    def _build_home_panel(self) -> tk.Frame:
+        panel = tk.Frame(self.content_area, bg=_APP_BG)
+        tk.Label(
+            panel,
+            text="RigTech",
+            bg=_APP_BG,
+            fg=_ACCENT,
+            font=("Helvetica", 52, "bold"),
+        ).place(relx=0.5, rely=0.42, anchor="center")
+        tk.Label(
+            panel,
+            text="Plataforma de Analise Agricola",
+            bg=_APP_BG,
+            fg="#888888",
+            font=("Helvetica", 16),
+        ).place(relx=0.5, rely=0.55, anchor="center")
+        return panel
+
+    def _build_placeholder_panel(self, title: str) -> tk.Frame:
+        panel = tk.Frame(self.content_area, bg=_APP_BG)
+        tk.Label(
+            panel,
+            text=title,
+            bg=_APP_BG,
+            fg="#f5f5f5",
+            font=("Helvetica", 20, "bold"),
+        ).place(relx=0.5, rely=0.45, anchor="center")
+        tk.Label(
+            panel,
+            text="Em desenvolvimento",
+            bg=_APP_BG,
+            fg="#555555",
+            font=("Helvetica", 12),
+        ).place(relx=0.5, rely=0.53, anchor="center")
+        return panel
+
+    def _build_notes_panel(self) -> tk.Frame:
+        panel = tk.Frame(self.content_area, bg=_APP_BG)
+        inner = ttk.Frame(panel, padding=16)
+        inner.pack(fill="both", expand=True)
+
+        top_bar = ttk.Frame(inner)
         top_bar.pack(fill="x")
         ttk.Label(top_bar, text="Minhas notas", style="Header.TLabel").pack(side="left")
 
-        body = ttk.Frame(self.notes_frame)
+        body = ttk.Frame(inner)
         body.pack(fill="both", expand=True, pady=12)
 
         left = ttk.Frame(body)
@@ -130,9 +245,7 @@ class NotesAppGUI:
         self.notes_list = tk.Listbox(left, width=32, height=25)
         self.notes_list.pack(side="left", fill="y")
         self.notes_list.bind("<<ListboxSelect>>", self._select_note)
-        note_scroll = ttk.Scrollbar(
-            left, orient="vertical", command=self.notes_list.yview
-        )
+        note_scroll = ttk.Scrollbar(left, orient="vertical", command=self.notes_list.yview)
         note_scroll.pack(side="right", fill="y")
         self.notes_list.configure(yscrollcommand=note_scroll.set)
 
@@ -155,21 +268,11 @@ class NotesAppGUI:
 
         buttons = ttk.Frame(right)
         buttons.pack(fill="x", pady=12)
-        ttk.Button(buttons, text="Nova nota", command=self._new_note).pack(
-            side="left", padx=4
-        )
-        ttk.Button(buttons, text="Salvar", command=self._save_note).pack(
-            side="left", padx=4
-        )
-        ttk.Button(buttons, text="Anexar arquivo", command=self._attach_file).pack(
-            side="left", padx=4
-        )
-        ttk.Button(buttons, text="Excluir", command=self._delete_note).pack(
-            side="left", padx=4
-        )
-        ttk.Button(buttons, text="Desfazer", command=self._undo).pack(
-            side="left", padx=4
-        )
+        ttk.Button(buttons, text="Nova nota", command=self._new_note).pack(side="left", padx=4)
+        ttk.Button(buttons, text="Salvar", command=self._save_note).pack(side="left", padx=4)
+        ttk.Button(buttons, text="Anexar arquivo", command=self._attach_file).pack(side="left", padx=4)
+        ttk.Button(buttons, text="Excluir", command=self._delete_note).pack(side="left", padx=4)
+        ttk.Button(buttons, text="Desfazer", command=self._undo).pack(side="left", padx=4)
 
         history_frame = ttk.Frame(right)
         history_frame.pack(fill="both", expand=False)
@@ -177,14 +280,27 @@ class NotesAppGUI:
         self.history_box = tk.Listbox(history_frame, height=5)
         self.history_box.pack(fill="x")
 
+        return panel
+
+    # ---------------------------------------------------------- navigation
+
+    def _show_panel(self, name: str) -> None:
+        for panel in self.panels.values():
+            panel.place_forget()
+        self.panels[name].place(relwidth=1, relheight=1)
+        if name == "notes":
+            self._refresh_notes()
+
     def _show_login(self) -> None:
-        self.notes_frame.pack_forget()
+        self.main_frame.pack_forget()
         self.login_frame.pack(fill="both", expand=True)
 
-    def _show_notes(self) -> None:
+    def _show_main(self) -> None:
         self.login_frame.pack_forget()
-        self.notes_frame.pack(fill="both", expand=True)
-        self._refresh_notes()
+        self.main_frame.pack(fill="both", expand=True)
+        self._show_panel("home")
+
+    # ---------------------------------------------------------- auth handlers
 
     def _handle_login(self) -> None:
         try:
@@ -195,8 +311,8 @@ class NotesAppGUI:
             messagebox.showerror("Login", str(exc))
             return
         self.current_user = usuario
-        self.root.title(f"Notes App - {usuario.login}")
-        self._show_notes()
+        self.root.title(f"RigTech - {usuario.login}")
+        self._show_main()
 
     def _handle_register(self) -> None:
         try:
@@ -217,6 +333,8 @@ class NotesAppGUI:
             return
         messagebox.showinfo("Registro", f"Usuario {usuario.login} criado.")
 
+    # ---------------------------------------------------------- notes logic
+
     def _refresh_notes(self) -> None:
         if not self.current_user:
             return
@@ -228,9 +346,7 @@ class NotesAppGUI:
             self.index_to_note[idx] = note.note_id
         self.history_box.delete(0, tk.END)
         self.attachments_list.delete(0, tk.END)
-        if self.current_note_id and not self.note_service.get_note(
-            self.current_note_id
-        ):
+        if self.current_note_id and not self.note_service.get_note(self.current_note_id):
             self.current_note_id = None
         if self.current_note_id:
             self._load_note(self.current_note_id)

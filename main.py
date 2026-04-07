@@ -22,7 +22,7 @@ from app.patterns.observer import LogNoteObserver, NoteEventBus, StatisticsObser
 
 ACTIVE_STORAGE = "json"  # altere para "mem" durante testes
 ACTIVE_LOGGER = "console"  # altere para "file" para persistir logs
-ACTIVE_INTERFACE = "api"  # "gui" ou "api"
+ACTIVE_INTERFACE = "gui"  # "gui" ou "api"
 
 
 def bootstrap() -> None:

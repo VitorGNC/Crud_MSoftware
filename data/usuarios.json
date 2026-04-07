@@ -8,5 +8,15 @@
     "is_admin": false,
     "ativo": true,
     "criado_em": "2026-03-24T03:21:02.654451"
+  },
+  {
+    "login": "vitor",
+    "nome": "vitor",
+    "email": "vitorgabrielnc@gmail.com",
+    "senha_hash": "d5240b07fe41c660$eba28373b5652a199cb8802be2856eaf592f30dca3064574d2909aa6ed7bb6df",
+    "idade": 18,
+    "is_admin": false,
+    "ativo": true,
+    "criado_em": "2026-04-07T00:22:43.470829"
   }
 ]
