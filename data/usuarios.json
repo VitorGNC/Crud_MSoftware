@@ -28,5 +28,15 @@
     "is_admin": false,
     "ativo": true,
     "criado_em": "2026-04-07T02:51:13.473181"
+  },
+  {
+    "login": "Jpfc",
+    "nome": "Joao chaves",
+    "email": "joaochavez166@gmail.com",
+    "senha_hash": "d5237af70859f1a5$ba8744c33d187e3f13f5622bd3edea784145164a1d9f0910fe1d92cb932255ab",
+    "idade": 18,
+    "is_admin": false,
+    "ativo": true,
+    "criado_em": "2026-04-07T14:39:45.262529"
   }
 ]
