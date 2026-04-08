@@ -46,6 +46,40 @@ class TalhaoService:
     def get_talhao(self, talhao_id: str) -> Optional[Talhao]:
         return self._repo.get(talhao_id)
 
+    def atualizar_talhao(
+        self,
+        talhao_id: str,
+        nome: str | None = None,
+        variedade_cana: str | None = None,
+        idade: int | None = None,
+        ultima_colheita: str | None = None,
+        solo: str | None = None,
+        status: str | None = None,
+        previsao_colheita: str | None = None,
+        irrigacao: bool | None = None,
+    ) -> Talhao:
+        talhao = self._repo.get(talhao_id)
+        if not talhao:
+            raise ValueError(f"Talhao {talhao_id} nao encontrado.")
+        if nome is not None:
+            talhao.nome = nome.strip()
+        if variedade_cana is not None:
+            talhao.variedade_cana = variedade_cana.strip()
+        if idade is not None:
+            talhao.idade = int(idade)
+        if ultima_colheita is not None:
+            talhao.ultima_colheita = ultima_colheita.strip()
+        if solo is not None:
+            talhao.solo = solo.strip()
+        if status is not None:
+            talhao.status = status
+        if previsao_colheita is not None:
+            talhao.previsao_colheita = previsao_colheita.strip()
+        if irrigacao is not None:
+            talhao.irrigacao = bool(irrigacao)
+        self._repo.update(talhao)
+        return talhao
+
     def remover_talhao(self, talhao_id: str) -> None:
         self._repo.remove(talhao_id)
 

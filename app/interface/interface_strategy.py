@@ -27,5 +27,5 @@ class RestApiInterfaceStrategy(InterfaceStrategy):
         self.reload = reload
 
     def run(self, sender, receiver, note_service, user_service, talhao_service=None, satellite_service=None) -> None:
-        api_app = create_api_app(sender, receiver, note_service, user_service)
+        api_app = create_api_app(sender, receiver, note_service, user_service, talhao_service, satellite_service)
         uvicorn.run(api_app, host=self.host, port=self.port, reload=self.reload)
